@@ -631,16 +631,16 @@ cover-regulatory-engine/
 **Goal:** Enter an address, get a structured buildability assessment from the API.
 
 **Deliverables:**
-- [ ] ZIMAS ArcGIS REST client: query parcel geometry, zoning, lot dimensions
-- [ ] Mapbox geocoding integration (address → coordinates)
-- [ ] Parcel service: geocode → ZIMAS lookup → Postgres/PostGIS cache
-- [ ] Rule Resolution Orchestrator with three layers:
+- [x] ZIMAS ArcGIS REST client: query parcel geometry, zoning, lot dimensions
+- [x] Mapbox geocoding integration (address → coordinates)
+- [x] Parcel service: geocode → ZIMAS lookup → Postgres/PostGIS cache
+- [x] Rule Resolution Orchestrator with three layers:
   - Layer 1: Structured rules lookup by zone_class + building_type
   - Layer 2: Computation engine for conditional rules
   - Layer 3: RAG retrieval + LLM interpretation for uncovered regulations
-- [ ] Geometry engine: setback polygons from parcel geometry + resolved rules
-- [ ] FastAPI endpoints: POST /api/assess, GET /api/assess/{id}, GET /api/parcel/search
-- [ ] Assessment caching (lookup before recompute)
+- [x] Geometry engine: setback polygons from parcel geometry + resolved rules
+- [x] FastAPI endpoints: POST /api/assess, GET /api/assess/{id}, GET /api/parcel/search
+- [x] Assessment caching (lookup before recompute)
 
 **Key Tasks:**
 1. Build ZIMAS client with layer queries (1102 for zoning, parcel geometry, building outlines)

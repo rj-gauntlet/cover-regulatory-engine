@@ -30,3 +30,29 @@
   - Constraint geometry stored as GeoJSON in JSON column rather than PostGIS geometry for easier API serialization
   - Scraper covers 12 LAMC sections (definitions, use, R1, R2, RD, RE, RS, RU, R3, general provisions, exceptions)
   - Zone rules include ADU-specific overrides (California state law provisions) and Guest House limits
+
+## Phase 2: Core Engine + API — March 10, 2026
+- **Status:** Complete
+- **Deliverables:** 8/8 complete
+- **Files Created:**
+  - `backend/app/services/parcel/zimas.py` — ZIMAS ArcGIS REST client (zoning, parcels, buildings layers)
+  - `backend/app/services/parcel/geocoder.py` — Mapbox geocoding with LA bounding box
+  - `backend/app/services/parcel/service.py` — Parcel service with TTL-based Postgres caching
+  - `backend/app/services/engine/rules.py` — Layer 1: Structured rules lookup (deterministic)
+  - `backend/app/services/engine/compute.py` — Layer 2: Conditional computation engine
+  - `backend/app/services/engine/retriever.py` — Layer 3: RAG retrieval + LLM interpretation
+  - `backend/app/services/engine/geometry.py` — Setback polygon computation via Shapely
+  - `backend/app/services/engine/resolver.py` — Rule Resolution Orchestrator (3-layer merge + caching)
+  - `backend/app/api/routes/assess.py` — POST /api/assess, GET /api/assess/{id}
+  - `backend/app/api/routes/parcel.py` — GET /api/parcel/search, GET /api/parcel/{apn}
+  - `backend/app/api/routes/chat.py` — POST /api/chat/{id} with SSE streaming
+  - `backend/app/api/routes/feedback.py` — POST /api/feedback
+  - `backend/app/api/routes/admin.py` — Full admin API (pipeline status, logs, rules CRUD, regulations, feedback, stats)
+  - `backend/app/api/deps.py` — Dependency injection for DB session and LLM service
+- **Deviations:**
+  - Implemented chat and admin endpoints ahead of schedule (planned for Phases 4-6) since the API layer was the natural place to define them. Frontend work remains for those phases.
+- **Notes:**
+  - Assessment caching uses 1-hour TTL for same parcel+building_type combos
+  - ZIMAS client queries 3 layers: zoning (1102), parcels (14), buildings (28)
+  - Geometry engine uses approximate feet-to-degrees conversion at LA latitude (~34°N)
+  - Layer 3 gracefully falls back if OpenAI API is unavailable
