@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+}
+
+.mapboxgl-ctrl-geocoder {
+  width: 100% !important;
+  max-width: 100% !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+}
+
+.mapboxgl-ctrl-geocoder--input {
+  padding: 0.625rem 2.5rem !important;
+  font-size: 0.9375rem !important;
+  height: auto !important;
+}
+
+.mapboxgl-ctrl-geocoder--icon-search {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+@layer components {
+  .badge-deterministic {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+  }
+  .badge-computed {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800;
+  }
+  .badge-interpreted {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800;
+  }
+}

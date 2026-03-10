@@ -56,3 +56,34 @@
   - ZIMAS client queries 3 layers: zoning (1102), parcels (14), buildings (28)
   - Geometry engine uses approximate feet-to-degrees conversion at LA latitude (~34°N)
   - Layer 3 gracefully falls back if OpenAI API is unavailable
+
+## Phase 3: Frontend Core — March 10, 2026
+- **Status:** Complete
+- **Deliverables:** 8/8 complete
+- **Files Created:**
+  - `frontend/package.json` — Dependencies: Vue 3, Vue Router, Mapbox GL JS, Mapbox Geocoder
+  - `frontend/vite.config.ts` — Vite config with API proxy to backend
+  - `frontend/tsconfig.json` — TypeScript config with path aliases
+  - `frontend/tailwind.config.js` — Tailwind with custom color palette
+  - `frontend/index.html` — Entry HTML with Mapbox CSS
+  - `frontend/src/main.ts` — App entry point
+  - `frontend/src/style.css` — Tailwind directives + custom badge classes
+  - `frontend/src/App.vue` — Root layout with header nav
+  - `frontend/src/router/index.ts` — Vue Router (home + admin routes)
+  - `frontend/src/types/index.ts` — Full TypeScript interfaces matching backend schemas
+  - `frontend/src/services/api.ts` — Typed API client with SSE streaming support
+  - `frontend/src/views/HomeView.vue` — Main view: search + map + assessment panel
+  - `frontend/src/views/AdminView.vue` — Admin view: pipeline status + rules browser
+  - `frontend/src/components/AddressSearch.vue` — Address input with submit
+  - `frontend/src/components/MapView.vue` — Mapbox map with parcel/setback overlays
+  - `frontend/src/components/AssessmentPanel.vue` — Grouped constraints with confidence summary
+  - `frontend/src/components/ConstraintCard.vue` — Expandable constraint with citations, reasoning, feedback
+- **Deviations:**
+  - Admin view built as basic version (pipeline status + rules table) ahead of Phase 6. Full admin panel with feedback review, regulation browser, and re-ingestion trigger will be enhanced in Phase 6.
+  - Feedback widget (BF-02) integrated directly into ConstraintCard component ahead of Phase 5, since it was natural to include during constraint card build.
+- **Notes:**
+  - Vite proxy forwards /api to backend for local dev without CORS issues
+  - Map uses Mapbox light-v11 style for clean professional look
+  - Constraint cards color-coded by confidence: green (>=90%), amber (>=70%), red (<70%)
+  - Building type selector (SFH/ADU/Guest House) triggers re-assessment on change
+  - All must-have requirements (FR-01 through FR-07) are now functional

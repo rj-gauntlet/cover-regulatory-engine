@@ -666,14 +666,14 @@ cover-regulatory-engine/
 **Goal:** Working UI — enter an address, see the full assessment with map. All must-haves complete.
 
 **Deliverables:**
-- [ ] Vue 3 + Vite + TypeScript project with Tailwind CSS
-- [ ] Address search bar with Mapbox geocoding autocomplete
-- [ ] Mapbox GL JS map: parcel polygon, existing buildings, zone boundaries
-- [ ] Assessment panel: constraints grouped by category (setbacks, height, FAR, use, density, parking)
-- [ ] Each constraint: value, confidence badge, determination type, expandable citations
-- [ ] Setback lines and buildable area overlay on map
-- [ ] Responsive layout: map + assessment side-by-side (desktop), stacked (mobile)
-- [ ] Full API integration
+- [x] Vue 3 + Vite + TypeScript project with Tailwind CSS
+- [x] Address search bar with Mapbox geocoding autocomplete
+- [x] Mapbox GL JS map: parcel polygon, existing buildings, zone boundaries
+- [x] Assessment panel: constraints grouped by category (setbacks, height, FAR, use, density, parking)
+- [x] Each constraint: value, confidence badge, determination type, expandable citations
+- [x] Setback lines and buildable area overlay on map
+- [x] Responsive layout: map + assessment side-by-side (desktop), stacked (mobile)
+- [x] Full API integration
 
 **Key Tasks:**
 1. Scaffold Vue 3 + Vite + TypeScript project with Tailwind
