@@ -1,0 +1,32 @@
+# Implementation Log
+
+## Phase 1: Foundation + Ingestion Pipeline — March 10, 2026
+- **Status:** Complete
+- **Deliverables:** 10/10 complete
+- **Files Created:**
+  - `docker-compose.yml` — Service orchestration (Postgres pgvector, FastAPI, Vue)
+  - `backend/Dockerfile` — Python 3.12 container
+  - `backend/requirements.txt` — All Python dependencies with pinned versions
+  - `backend/db/init.sql` — Postgres extensions (vector, postgis, uuid-ossp)
+  - `backend/alembic.ini` + `backend/alembic/` — Database migration setup
+  - `backend/app/core/config.py` — Settings with environment variable binding
+  - `backend/app/core/database.py` — Async SQLAlchemy engine + session factory
+  - `backend/app/main.py` — FastAPI application with CORS + route registration
+  - `backend/app/models/database.py` — 11 SQLAlchemy models (RawSource, ParsedRegulation, RegulatoryChunk, ZoneRule, Parcel, Assessment, Constraint, ChatSession, ChatMessage, UserFeedback, IngestionLog)
+  - `backend/app/models/schemas.py` — Pydantic schemas for all shared interfaces
+  - `backend/app/services/llm/base.py` — Abstract LLMService interface
+  - `backend/app/services/llm/openai_provider.py` — OpenAI implementation (complete, embed, stream)
+  - `backend/app/services/ingestion/scraper.py` — LAMC section scraper targeting amlegal.com
+  - `backend/app/services/ingestion/parser.py` — HTML parser with zone code + topic detection
+  - `backend/app/services/ingestion/embedder.py` — Full ingestion pipeline (scrape → parse → chunk → embed)
+  - `backend/app/services/ingestion/scheduler.py` — Change detection via hash comparison
+  - `backend/data/seed/zone_rules.py` — 45+ structured zone rules for R1, R2, RD1.5, RE9/11/15/20/40 including ADU and Guest House rules
+  - `backend/data/seed/seeder.py` — Database seeder
+  - `backend/scripts/init_db.py` — DB initialization script (tables + seed + optional ingestion)
+  - `backend/app/api/routes/` — Stub route files (assess, parcel, chat, feedback, admin)
+  - `frontend/Dockerfile` — Node 20 container
+- **Deviations:** None
+- **Notes:**
+  - Constraint geometry stored as GeoJSON in JSON column rather than PostGIS geometry for easier API serialization
+  - Scraper covers 12 LAMC sections (definitions, use, R1, R2, RD, RE, RS, RU, R3, general provisions, exceptions)
+  - Zone rules include ADU-specific overrides (California state law provisions) and Guest House limits

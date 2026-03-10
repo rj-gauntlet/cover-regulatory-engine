@@ -594,16 +594,16 @@ cover-regulatory-engine/
 **Goal:** Project scaffolded, database running, regulatory data ingested and embedded.
 
 **Deliverables:**
-- [ ] Monorepo scaffolding: `backend/` + `frontend/` directories
-- [ ] Docker Compose: Postgres with pgvector + PostGIS, FastAPI dev server
-- [ ] SQLAlchemy models + Alembic migrations for all data models
-- [ ] Shared Pydantic models (ParcelData, Constraint, Citation, Assessment)
-- [ ] LLMService abstract interface + OpenAI implementation
-- [ ] LAMC scraper: download zoning code HTML from amlegal.com
-- [ ] HTML parser: extract regulatory text with section hierarchy
-- [ ] Chunker + embedder: semantic chunks → text-embedding-3-small → pgvector
-- [ ] Structured zone rules: seed R1, R2, RD1.5, RE zones with core parameters
-- [ ] Change detection: hash-based comparison + ingestion audit log
+- [x] Monorepo scaffolding: `backend/` + `frontend/` directories
+- [x] Docker Compose: Postgres with pgvector + PostGIS, FastAPI dev server
+- [x] SQLAlchemy models + Alembic migrations for all data models
+- [x] Shared Pydantic models (ParcelData, Constraint, Citation, Assessment)
+- [x] LLMService abstract interface + OpenAI implementation
+- [x] LAMC scraper: download zoning code HTML from amlegal.com
+- [x] HTML parser: extract regulatory text with section hierarchy
+- [x] Chunker + embedder: semantic chunks → text-embedding-3-small → pgvector
+- [x] Structured zone rules: seed R1, R2, RD1.5, RE zones with core parameters
+- [x] Change detection: hash-based comparison + ingestion audit log
 
 **Key Tasks:**
 1. Initialize project with Docker Compose (Postgres pgvector/postgis image)
