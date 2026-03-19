@@ -171,3 +171,22 @@
   - Zones R3, R4, C2 correctly return 0 constraints since they're outside the seeded residential zone coverage (R1, R2, RD, RE)
   - RE20/RE40 zones have fewer seeded rules (min lot area + side setback only) — front/rear setbacks could be expanded in future
   - All 45 seeded zone rules are marked `is_verified: True`
+
+## Ship — March 10, 2026
+- **Status:** Complete
+- **Actions:**
+  - Fixed Layer 3 SQL type mismatch (`varchar[] && text[]`) — changed from string CAST to SQLAlchemy `bindparam` with `ARRAY(String)` type for proper asyncpg array handling
+  - Fixed fragile setback substring matching — changed to exact parameter name comparison
+  - Pre-cached 10 representative parcels across R1, R2, RD1.5, RE20, R3, C1, C4 zones for instant demo experience
+  - Created `.gitignore` excluding `.env`, `__pycache__`, `node_modules`, test artifacts
+  - Updated `TEST_REPORT.md` and `REVIEW_REPORT.md` to reflect resolved issues
+  - Generated `RELEASE.md` with full release documentation
+  - Committed all changes to git (6 commits total from initial scaffold to ship)
+  - Regenerated `DASHBOARD.html` to reflect shipped state (100% completion)
+  - Updated `PROJECT_PLAN.md` status to SHIPPED
+- **Final State:**
+  - 0 critical issues, 2 PoC-acceptable warnings
+  - 44/44 tests passing (3 smoke + 27 integration + 6 E2E + 8 edge cases)
+  - All 14 functional requirements met
+  - All 7 non-functional requirements met
+  - All 6 bonus features implemented
