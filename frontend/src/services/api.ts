@@ -1,10 +1,24 @@
-import type { Assessment, AssessmentRequest, ChatMessage, FeedbackRequest, Parcel, PipelineStatus, ZoneRule } from '@/types'
+import type {
+  AdminFeedback,
+  Assessment,
+  AssessmentRequest,
+  ChatMessage,
+  FeedbackRequest,
+  Parcel,
+  PipelineStatus,
+  ZoneRule,
+} from '@/types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || ''
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   })
 
@@ -13,6 +27,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(error.detail || `Request failed: ${response.status}`)
   }
 
+  if (response.status === 204) return undefined as T
   return response.json()
 }
 
@@ -46,11 +61,13 @@ export const api = {
       message: string,
       onToken: (token: string) => void,
       onDone: () => void,
+      signal?: AbortSignal,
     ): Promise<void> {
       const response = await fetch(`${BASE_URL}/api/chat/${assessmentId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, assessment_id: assessmentId }),
+        signal,
       })
 
       if (!response.ok) {
@@ -61,13 +78,15 @@ export const api = {
       if (!reader) throw new Error('No response body')
 
       const decoder = new TextDecoder()
+      let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -112,8 +131,30 @@ export const api = {
       return request(`/api/admin/rules${params}`)
     },
 
+    updateRule(ruleId: string, data: Partial<ZoneRule>): Promise<ZoneRule> {
+      return request(`/api/admin/rules/${ruleId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+    },
+
+    feedback(rating?: string): Promise<AdminFeedback[]> {
+      const params = rating ? `?rating=${encodeURIComponent(rating)}` : ''
+      return request(`/api/admin/feedback${params}`)
+    },
+
     triggerIngestion(): Promise<{ status: string; stats: Record<string, number> }> {
       return request('/api/admin/pipeline/trigger', { method: 'POST' })
+    },
+  },
+
+  geojson: {
+    export(assessmentId: string): Promise<any> {
+      return request(`/api/assess/${assessmentId}/geojson`)
+    },
+
+    exportUrl(assessmentId: string): string {
+      return `${BASE_URL}/api/assess/${assessmentId}/geojson`
     },
   },
 }

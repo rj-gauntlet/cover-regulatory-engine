@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from sqlalchemy import (
     String, Text, Float, Integer, Boolean, DateTime, Date,
@@ -7,11 +7,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
-from geoalchemy2 import Geometry
 from pgvector.sqlalchemy import Vector
 
 from app.core.database import Base
 from app.core.config import settings
+
+
+def _utcnow() -> datetime:
+    """Naive UTC timestamp compatible with TIMESTAMP WITHOUT TIME ZONE columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class RawSource(Base):
@@ -22,7 +26,7 @@ class RawSource(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     raw_content: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[str] = mapped_column(String(10), nullable=False)  # "html" | "pdf"
-    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     superseded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("raw_sources.id"), nullable=True)
 
     regulations: Mapped[list["ParsedRegulation"]] = relationship(back_populates="raw_source")
@@ -41,7 +45,7 @@ class ParsedRegulation(Base):
     topic: Mapped[str] = mapped_column(String(100), nullable=False)
     body_text: Mapped[str] = mapped_column(Text, nullable=False)
     effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    parsed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    parsed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     raw_source: Mapped["RawSource"] = relationship(back_populates="regulations")
     chunks: Mapped[list["RegulatoryChunk"]] = relationship(back_populates="regulation")
@@ -112,12 +116,12 @@ class Parcel(Base):
     lot_area_sqft: Mapped[float | None] = mapped_column(Float, nullable=True)
     lot_width_ft: Mapped[float | None] = mapped_column(Float, nullable=True)
     lot_depth_ft: Mapped[float | None] = mapped_column(Float, nullable=True)
-    geometry: Mapped[str | None] = mapped_column(Geometry("POLYGON", srid=4326), nullable=True)
-    building_footprints: Mapped[str | None] = mapped_column(Geometry("GEOMETRYCOLLECTION", srid=4326), nullable=True)
+    geometry: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    building_footprints: Mapped[list | None] = mapped_column(JSON, nullable=True)
     centroid_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     centroid_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     community_plan_area: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    cached_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     cache_ttl_days: Mapped[int] = mapped_column(Integer, default=30)
 
     assessments: Mapped[list["Assessment"]] = relationship(back_populates="parcel")
@@ -136,7 +140,7 @@ class Assessment(Base):
     project_inputs: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     overall_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     parcel: Mapped["Parcel"] = relationship(back_populates="assessments")
     constraints: Mapped[list["Constraint"]] = relationship(back_populates="assessment", cascade="all, delete-orphan")
@@ -171,7 +175,7 @@ class ChatSession(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     assessment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("assessments.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     assessment: Mapped["Assessment"] = relationship(back_populates="chat_sessions")
     messages: Mapped[list["ChatMessage"]] = relationship(back_populates="session", cascade="all, delete-orphan")
@@ -185,7 +189,7 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     citations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     session: Mapped["ChatSession"] = relationship(back_populates="messages")
 
@@ -198,7 +202,7 @@ class UserFeedback(Base):
     assessment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("assessments.id"), nullable=False)
     rating: Mapped[str] = mapped_column(String(10), nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     assessment: Mapped["Assessment"] = relationship(back_populates="feedback")
 
@@ -213,5 +217,5 @@ class IngestionLog(Base):
     new_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     chunks_created: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rules_extracted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

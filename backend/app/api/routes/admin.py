@@ -1,9 +1,12 @@
 """Admin panel API endpoints."""
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.api.deps import get_session
 from app.models.database import (
@@ -52,7 +55,7 @@ async def pipeline_status(db: AsyncSession = Depends(get_session)):
 
 @router.get("/pipeline/logs", response_model=list[IngestionLogSchema])
 async def pipeline_logs(
-    limit: int = 50,
+    limit: int = Query(default=50, le=500),
     db: AsyncSession = Depends(get_session),
 ):
     """Get ingestion audit logs."""
@@ -77,10 +80,21 @@ async def pipeline_logs(
 
 @router.post("/pipeline/trigger")
 async def trigger_ingestion(db: AsyncSession = Depends(get_session)):
-    """Manually trigger a re-ingestion of regulatory data."""
+    """Manually trigger a re-ingestion of regulatory data.
+
+    WARNING: This is a long-running operation that may take several minutes.
+    """
     from app.services.ingestion.embedder import run_full_ingestion
-    stats = await run_full_ingestion(db)
-    return {"status": "complete", "stats": stats}
+    try:
+        stats = await run_full_ingestion(db)
+    except Exception as exc:
+        logger.exception("Ingestion failed")
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}")
+    return {
+        "status": "complete",
+        "stats": stats,
+        "warning": "This was a synchronous operation. Consider using a task queue for production workloads.",
+    }
 
 
 @router.get("/rules", response_model=list[ZoneRuleSchema])
@@ -162,7 +176,7 @@ async def update_rule(
 async def list_regulations(
     zone_code: str | None = None,
     topic: str | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, le=500),
     db: AsyncSession = Depends(get_session),
 ):
     """Browse parsed regulations."""
@@ -185,7 +199,7 @@ async def list_regulations(
             "chapter": reg.chapter,
             "zone_codes": reg.zone_codes,
             "topic": reg.topic,
-            "body_text": reg.body_text[:500] + "..." if len(reg.body_text) > 500 else reg.body_text,
+            "body_text": ((reg.body_text or "")[:500] + "...") if len(reg.body_text or "") > 500 else (reg.body_text or ""),
             "parsed_at": reg.parsed_at.isoformat(),
         }
         for reg in regulations
@@ -195,7 +209,7 @@ async def list_regulations(
 @router.get("/feedback", response_model=list[FeedbackSchema])
 async def list_feedback(
     rating: str | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, le=500),
     db: AsyncSession = Depends(get_session),
 ):
     """Browse user feedback."""
@@ -224,6 +238,7 @@ async def list_feedback(
 async def system_stats(db: AsyncSession = Depends(get_session)):
     """System statistics summary."""
     status = await pipeline_status(db)
+    # TODO: replace hardcoded lists with a DB query (e.g. SELECT DISTINCT zone_class FROM zone_rules)
     return {
         "pipeline": status.model_dump(),
         "zone_classes_covered": [

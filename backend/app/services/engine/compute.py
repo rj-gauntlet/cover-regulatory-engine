@@ -35,7 +35,6 @@ class ComputationEngine:
         self, constraint: ConstraintSchema, parcel: ParcelSchema
     ) -> ConstraintSchema:
         """Evaluate a single constraint's conditions against parcel data."""
-        zone_rule_id = constraint.zone_rule_id
         if constraint.parameter == "side_setback" and parcel.lot_width_ft:
             lot_width = parcel.lot_width_ft
             if lot_width < 50:
@@ -78,7 +77,7 @@ class ComputationEngine:
                     confidence=1.0,
                     source_layer="computed",
                     determination_type="deterministic",
-                    citations=far_constraint.citations,
+                    citations=[c.model_copy() for c in far_constraint.citations],
                     reasoning=(
                         f"Computed from lot area ({parcel.lot_area_sqft:,.0f} sqft) × "
                         f"FAR ({far_constraint.numeric_value}) = {max_floor_area:,.0f} sqft"
@@ -89,7 +88,7 @@ class ComputationEngine:
             density_rule = next(
                 (c for c in existing_constraints if c.parameter == "lot_area_per_unit"), None
             )
-            if density_rule and density_rule.numeric_value:
+            if density_rule and density_rule.numeric_value and density_rule.numeric_value > 0:
                 max_units = int(parcel.lot_area_sqft / density_rule.numeric_value)
                 derived.append(ConstraintSchema(
                     category="density",
@@ -101,7 +100,7 @@ class ComputationEngine:
                     confidence=1.0,
                     source_layer="computed",
                     determination_type="deterministic",
-                    citations=density_rule.citations,
+                    citations=[c.model_copy() for c in density_rule.citations],
                     reasoning=(
                         f"Computed from lot area ({parcel.lot_area_sqft:,.0f} sqft) ÷ "
                         f"area per unit ({density_rule.numeric_value:,.0f} sqft) = {max_units} units"

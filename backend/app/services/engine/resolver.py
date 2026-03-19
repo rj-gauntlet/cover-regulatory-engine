@@ -1,14 +1,13 @@
 """Rule Resolution Orchestrator — coordinates the three-layer hybrid engine."""
 import logging
-import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Assessment as AssessmentDB, Constraint as ConstraintDB
 from app.models.schemas import (
-    AssessmentSchema, AssessmentRequest, ConstraintSchema, ParcelSchema,
+    AssessmentSchema, ConstraintSchema, ParcelSchema,
 )
 from app.services.engine.rules import StructuredRuleLookup
 from app.services.engine.compute import ComputationEngine
@@ -58,14 +57,16 @@ class RuleResolver:
         logger.info(f"After Layer 2: {len(constraints)} constraints")
 
         # Layer 3: RAG + LLM (only if we have embeddings and an API key)
+        # Wrapped in a savepoint so SQL failures don't corrupt the transaction
         try:
-            llm_constraints = await self.retriever.interpret_regulations(
-                parcel=parcel,
-                building_type=building_type,
-                existing_constraints=constraints,
-            )
-            constraints.extend(llm_constraints)
-            logger.info(f"After Layer 3: {len(constraints)} total constraints")
+            async with self.db.begin_nested():
+                llm_constraints = await self.retriever.interpret_regulations(
+                    parcel=parcel,
+                    building_type=building_type,
+                    existing_constraints=constraints,
+                )
+                constraints.extend(llm_constraints)
+                logger.info(f"After Layer 3: {len(constraints)} total constraints")
         except Exception as e:
             logger.warning(f"Layer 3 failed (continuing with Layer 1+2 results): {e}")
 
@@ -75,7 +76,7 @@ class RuleResolver:
         for constraint in constraints:
             if constraint.category == "setback" and geometry_data.get("setback_lines"):
                 for feature in geometry_data["setback_lines"]["features"]:
-                    if feature["properties"]["setback_type"] in constraint.parameter:
+                    if constraint.parameter == f"{feature['properties']['setback_type']}_setback":
                         constraint.geometry_geojson = feature["geometry"]
 
         # Compute overall confidence
@@ -132,7 +133,7 @@ class RuleResolver:
             for h in height:
                 lines.append(f"  - {h.rule_text}")
 
-        return "\n".join(line for line in lines if line is not None)
+        return "\n".join(line for line in lines if line)
 
     async def _check_cache(
         self,
@@ -151,7 +152,10 @@ class RuleResolver:
         if not cached:
             return None
 
-        age = (datetime.utcnow() - cached.created_at).total_seconds()
+        if project_inputs != cached.project_inputs:
+            return None
+
+        age = (datetime.now(timezone.utc).replace(tzinfo=None) - cached.created_at).total_seconds()
         if age > 3600:  # 1 hour cache
             return None
 
@@ -210,7 +214,7 @@ class RuleResolver:
         await self.db.flush()
 
         for constraint in assessment.constraints:
-            citations_data = [c.model_dump(mode="json") for c in constraint.citations]
+            citations_data = [c.model_dump(mode="json") for c in (constraint.citations or [])]
             db_constraint = ConstraintDB(
                 id=constraint.id,
                 assessment_id=assessment.id,

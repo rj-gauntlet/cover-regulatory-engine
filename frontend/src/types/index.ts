@@ -87,6 +87,15 @@ export interface PipelineStatus {
   last_ingestion: string | null
 }
 
+export interface AdminFeedback {
+  id: string
+  constraint_id: string | null
+  assessment_id: string
+  rating: 'positive' | 'negative'
+  comment: string | null
+  created_at: string
+}
+
 export interface ZoneRule {
   id: string
   zone_class: string
@@ -101,8 +110,6 @@ export interface ZoneRule {
   is_verified: boolean
   notes: string | null
 }
-
-export type ConstraintCategory = 'setback' | 'height' | 'far' | 'density' | 'use' | 'parking' | 'lot' | 'adu' | 'coverage' | 'other'
 
 export const CATEGORY_LABELS: Record<string, string> = {
   setback: 'Setbacks',

@@ -2,12 +2,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, get_llm
-from app.models.database import Assessment as AssessmentDB, Constraint as ConstraintDB
-from app.models.schemas import AssessmentSchema, AssessmentRequest, ConstraintSchema
+from app.models.database import Assessment as AssessmentDB, Constraint as ConstraintDB, Parcel as ParcelDB
+from app.models.schemas import AssessmentSchema, AssessmentRequest, ConstraintSchema, ParcelSchema
 from app.services.parcel.service import ParcelService
 from app.services.engine.resolver import RuleResolver
 from app.services.llm.base import LLMService
@@ -66,12 +67,30 @@ async def get_assessment(
     )
     db_constraints = constraint_rows.scalars().all()
 
-    from app.services.parcel.service import ParcelService
-    parcel_service = ParcelService(db)
-    parcel = await parcel_service.get_by_apn(
-        (await db.execute(
-            select(AssessmentDB).where(AssessmentDB.id == assessment_id)
-        )).scalar_one().parcel_id
+    parcel_result = await db.execute(
+        select(ParcelDB).where(ParcelDB.id == assessment.parcel_id)
+    )
+    parcel_db = parcel_result.scalar_one_or_none()
+    if not parcel_db:
+        raise HTTPException(status_code=404, detail="Parcel not found for this assessment")
+
+    parcel = ParcelSchema(
+        id=parcel_db.id,
+        apn=parcel_db.apn,
+        address=parcel_db.address,
+        zone_code=parcel_db.zone_code,
+        zone_class=parcel_db.zone_class,
+        height_district=parcel_db.height_district,
+        specific_plan=parcel_db.specific_plan,
+        overlay_zones=parcel_db.overlay_zones or [],
+        lot_area_sqft=parcel_db.lot_area_sqft,
+        lot_width_ft=parcel_db.lot_width_ft,
+        lot_depth_ft=parcel_db.lot_depth_ft,
+        centroid_lat=parcel_db.centroid_lat,
+        centroid_lng=parcel_db.centroid_lng,
+        community_plan_area=parcel_db.community_plan_area,
+        geometry_geojson=parcel_db.geometry,
+        building_footprints_geojson=parcel_db.building_footprints,
     )
 
     constraints = [
@@ -103,4 +122,83 @@ async def get_assessment(
         overall_confidence=assessment.overall_confidence,
         summary=assessment.summary,
         created_at=assessment.created_at,
+    )
+
+
+@router.get("/{assessment_id}/geojson")
+async def export_geojson(
+    assessment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_session),
+):
+    """Export assessment as GeoJSON FeatureCollection."""
+    result = await db.execute(
+        select(AssessmentDB).where(AssessmentDB.id == assessment_id)
+    )
+    assessment = result.scalar_one_or_none()
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    parcel_result = await db.execute(
+        select(ParcelDB).where(ParcelDB.id == assessment.parcel_id)
+    )
+    parcel = parcel_result.scalar_one_or_none()
+
+    constraint_rows = await db.execute(
+        select(ConstraintDB).where(ConstraintDB.assessment_id == assessment_id)
+    )
+    constraints = constraint_rows.scalars().all()
+
+    features = []
+
+    parcel_geom = parcel.geometry if parcel else None
+
+    if parcel and parcel_geom:
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "layer": "parcel",
+                "address": parcel.address,
+                "apn": parcel.apn,
+                "zone_code": parcel.zone_code,
+                "zone_class": parcel.zone_class,
+                "lot_area_sqft": parcel.lot_area_sqft,
+            },
+            "geometry": parcel_geom,
+        })
+
+    for c in constraints:
+        geom = c.geometry_geojson or parcel_geom
+        if geom is None:
+            continue
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "layer": "constraint",
+                "category": c.category,
+                "parameter": c.parameter,
+                "value": c.value,
+                "numeric_value": c.numeric_value,
+                "unit": c.unit,
+                "confidence": c.confidence,
+                "determination_type": c.determination_type,
+            },
+            "geometry": geom,
+        })
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "assessment_id": str(assessment_id),
+            "building_type": assessment.building_type,
+            "overall_confidence": assessment.overall_confidence,
+            "summary": assessment.summary,
+        },
+    }
+
+    return JSONResponse(
+        content=geojson,
+        headers={
+            "Content-Disposition": f'attachment; filename="assessment_{str(assessment_id)[:8]}.geojson"',
+        },
     )

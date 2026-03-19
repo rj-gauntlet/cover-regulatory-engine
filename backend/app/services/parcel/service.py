@@ -1,14 +1,19 @@
 """Parcel service: geocode → ZIMAS lookup → cache."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+from app.models.database import _utcnow
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.database import Parcel
 from app.models.schemas import ParcelSchema
 from app.services.parcel.geocoder import geocode_address
 from app.services.parcel.zimas import ZIMASClient
+
+CACHE_TTL_DAYS = settings.parcel_cache_ttl_days
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +70,7 @@ class ParcelService:
             select(Parcel).where(
                 Parcel.centroid_lat.between(lat - 0.0005, lat + 0.0005),
                 Parcel.centroid_lng.between(lng - 0.0005, lng + 0.0005),
-                Parcel.cached_at > datetime.utcnow() - timedelta(days=30),
+                Parcel.cached_at > _utcnow() - timedelta(days=CACHE_TTL_DAYS),
             ).limit(1)
         )
         return result.scalar_one_or_none()
@@ -74,14 +79,14 @@ class ParcelService:
         result = await self.db.execute(
             select(Parcel).where(
                 Parcel.apn == apn,
-                Parcel.cached_at > datetime.utcnow() - timedelta(days=30),
+                Parcel.cached_at > _utcnow() - timedelta(days=CACHE_TTL_DAYS),
             ).limit(1)
         )
         return result.scalar_one_or_none()
 
     async def _cache_parcel(self, data: dict) -> Parcel:
         """Store parcel data in the cache."""
-        apn = data.get("apn", f"unknown-{datetime.utcnow().timestamp()}")
+        apn = data.get("apn", f"unknown-{_utcnow().timestamp()}")
 
         existing = await self.db.execute(
             select(Parcel).where(Parcel.apn == apn)
@@ -101,7 +106,9 @@ class ParcelService:
             parcel.centroid_lat = data.get("centroid_lat")
             parcel.centroid_lng = data.get("centroid_lng")
             parcel.community_plan_area = data.get("community_plan_area")
-            parcel.cached_at = datetime.utcnow()
+            parcel.geometry = data.get("geometry")
+            parcel.building_footprints = data.get("building_footprints")
+            parcel.cached_at = _utcnow()
         else:
             parcel = Parcel(
                 apn=apn,
@@ -117,6 +124,8 @@ class ParcelService:
                 centroid_lat=data.get("centroid_lat"),
                 centroid_lng=data.get("centroid_lng"),
                 community_plan_area=data.get("community_plan_area"),
+                geometry=data.get("geometry"),
+                building_footprints=data.get("building_footprints"),
             )
             self.db.add(parcel)
 
@@ -139,4 +148,6 @@ class ParcelService:
             centroid_lat=parcel.centroid_lat,
             centroid_lng=parcel.centroid_lng,
             community_plan_area=parcel.community_plan_area,
+            geometry_geojson=parcel.geometry,
+            building_footprints_geojson=parcel.building_footprints,
         )

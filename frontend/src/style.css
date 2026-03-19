@@ -12,8 +12,8 @@ html, body, #app {
   max-width: 100% !important;
   font-family: inherit !important;
   box-shadow: none !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 0.5rem !important;
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 6px !important;
 }
 
 .mapboxgl-ctrl-geocoder--input {
@@ -27,14 +27,26 @@ html, body, #app {
   transform: translateY(-50%) !important;
 }
 
+/* Refined scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+
 @layer components {
   .badge-deterministic {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide;
+    background: rgba(74, 158, 110, 0.1);
+    color: #4a9e6e;
   }
   .badge-computed {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide;
+    background: rgba(200, 169, 126, 0.15);
+    color: #c8a97e;
   }
   .badge-interpreted {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide;
+    background: rgba(200, 169, 126, 0.15);
+    color: #c8a97e;
   }
 }

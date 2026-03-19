@@ -1,0 +1,6 @@
+<svg viewBox="0 0 32 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Path 1: building outline (upper-left, open line) -->
+  <path d="M9 24 L3 18 L3 10 L9 4 L19 4" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Path 2: arrow (lower-right, open line) - shares start point, different end = C gap -->
+  <path d="M9 24 L17 31 L26 14" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

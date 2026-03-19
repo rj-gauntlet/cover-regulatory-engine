@@ -698,10 +698,10 @@ cover-regulatory-engine/
 **Goal:** Assessment responds to project context. Conversational follow-up with streaming.
 
 **Deliverables:**
-- [ ] **BF-01:** Project inputs panel — building type selector (SFH, ADU, Guest House), bedrooms, bathrooms, sqft, stories. Assessment updates dynamically.
-- [ ] **BF-03:** Chat panel — SSE streaming responses. Follow-up questions about assessment. LLM receives assessment context + regulatory chunks + parcel data.
-- [ ] Chat history persistence per assessment
-- [ ] Smooth streaming text rendering
+- [x] **BF-01:** Project inputs panel — building type selector (SFH, ADU, Guest House), bedrooms, bathrooms, sqft, stories. Assessment updates dynamically.
+- [x] **BF-03:** Chat panel — SSE streaming responses. Follow-up questions about assessment. LLM receives assessment context + regulatory chunks + parcel data.
+- [x] Chat history persistence per assessment
+- [x] Smooth streaming text rendering
 
 **Key Tasks:**
 1. Build ProjectInputs component with form fields
@@ -723,10 +723,10 @@ cover-regulatory-engine/
 **Goal:** User feedback collection, rich map annotations, precise setback geometry.
 
 **Deliverables:**
-- [ ] **BF-02:** Feedback widget — thumbs up/down per constraint + optional comment, stored in DB
-- [ ] **BF-04:** Interactive regulatory map — zone boundaries as colored overlays, click-to-inspect zone rules, setback lines with distance labels, buildable area polygon, height annotations
-- [ ] **BF-05:** Actionable geometry — precise setback polygons from parcel + rules, buildable envelope, visual diff between parcel boundary and buildable area, exportable GeoJSON
-- [ ] Map interactions: hover tooltips, click-to-inspect, legend
+- [x] **BF-02:** Feedback widget — thumbs up/down per constraint + optional comment, stored in DB
+- [x] **BF-04:** Interactive regulatory map — zone boundaries as colored overlays, click-to-inspect zone rules, setback lines with distance labels, buildable area polygon, height annotations
+- [x] **BF-05:** Actionable geometry — precise setback polygons from parcel + rules, buildable envelope, visual diff between parcel boundary and buildable area, exportable GeoJSON
+- [x] Map interactions: hover tooltips, click-to-inspect, legend
 
 **Key Tasks:**
 1. Build FeedbackWidget component with thumbs + comment form
@@ -750,16 +750,16 @@ cover-regulatory-engine/
 **Goal:** Admin interface demonstrates the full pipeline. UI is polished and professional.
 
 **Deliverables:**
-- [ ] **BF-06:** Admin panel at `/admin`:
+- [x] **BF-06:** Admin panel at `/admin`:
   - Pipeline status dashboard (last ingestion, chunk count, rule count)
   - Ingestion audit log viewer
   - Parsed regulations browser with search
   - Structured rules table: browse, filter by zone, view/edit values, mark verified
   - User feedback review: filter by rating, link to originating assessment
   - Manual re-ingestion trigger
-- [ ] UI polish: loading states, error states, empty states, transitions
-- [ ] Edge case handling: invalid addresses, parcels outside LA, API errors
-- [ ] Responsive design verification
+- [x] UI polish: loading states, error states, empty states, transitions
+- [x] Edge case handling: invalid addresses, parcels outside LA, API errors
+- [x] Responsive design verification
 
 **Key Tasks:**
 1. Build admin route with tabbed navigation
@@ -782,18 +782,18 @@ cover-regulatory-engine/
 **Goal:** Verified, documented, submission-ready.
 
 **Deliverables:**
-- [ ] Test on range of residential parcels:
+- [x] Test on range of residential parcels:
   - R1 zone: Single Family Home
   - R1 zone: ADU
   - R2 zone: Two-family dwelling
   - RD zone: Small lot development
   - RE zone: Large lot estate
   - Various: Guest House
-- [ ] Verify deterministic constraint values against known LAMC rules
-- [ ] Architecture diagram: Mermaid logical diagram + AWS deployment diagram + data flow diagram
-- [ ] README: setup instructions, environment variables, design decisions, architecture overview
-- [ ] Bug fixes from testing
-- [ ] Final review pass
+- [x] Verify deterministic constraint values against known LAMC rules
+- [x] Architecture diagram: Mermaid logical diagram + AWS deployment diagram + data flow diagram
+- [x] README: setup instructions, environment variables, design decisions, architecture overview
+- [x] Bug fixes from testing
+- [x] Final review pass
 
 **Success Criteria:**
 - `docker compose up` starts the full application

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from typing import Literal
+from pydantic import BaseModel, Field, model_validator
 
 
 class CitationSchema(BaseModel):
@@ -43,7 +44,7 @@ class ParcelSchema(BaseModel):
     lot_width_ft: float | None = None
     lot_depth_ft: float | None = None
     geometry_geojson: dict | None = None
-    building_footprints_geojson: dict | None = None
+    building_footprints_geojson: list | dict | None = None
     centroid_lat: float | None = None
     centroid_lng: float | None = None
     community_plan_area: str | None = None
@@ -57,14 +58,20 @@ class AssessmentSchema(BaseModel):
     constraints: list[ConstraintSchema] = Field(default_factory=list)
     overall_confidence: float = 1.0
     summary: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class AssessmentRequest(BaseModel):
     address: str | None = None
     apn: str | None = None
-    building_type: str = "SFH"
+    building_type: Literal["SFH", "ADU", "Guest House"] = "SFH"
     project_inputs: dict | None = None
+
+    @model_validator(mode="after")
+    def require_address_or_apn(self) -> AssessmentRequest:
+        if not self.address and not self.apn:
+            raise ValueError("At least one of 'address' or 'apn' must be provided")
+        return self
 
 
 class ChatMessageSchema(BaseModel):
@@ -72,18 +79,17 @@ class ChatMessageSchema(BaseModel):
     role: str
     content: str
     citations: list[CitationSchema] | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class ChatRequest(BaseModel):
-    message: str
-    assessment_id: uuid.UUID
+    message: str = Field(..., max_length=5000)
 
 
 class FeedbackRequest(BaseModel):
     constraint_id: uuid.UUID | None = None
     assessment_id: uuid.UUID
-    rating: str  # "positive" | "negative"
+    rating: Literal["positive", "negative"]
     comment: str | None = None
 
 
@@ -93,7 +99,7 @@ class FeedbackSchema(BaseModel):
     assessment_id: uuid.UUID
     rating: str
     comment: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class ZoneRuleSchema(BaseModel):

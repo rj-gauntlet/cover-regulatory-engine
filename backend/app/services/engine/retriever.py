@@ -2,10 +2,10 @@
 import json
 import logging
 
-from sqlalchemy import select, text
+from sqlalchemy import text, bindparam
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import String
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.database import RegulatoryChunk
 from app.models.schemas import ConstraintSchema, CitationSchema, ParcelSchema
 from app.services.llm.base import LLMService
 
@@ -32,7 +32,9 @@ For each constraint you identify, provide:
 7. reasoning: how you derived this from the source text
 8. citation_text: the specific passage from the regulation that supports this
 
-Return a JSON array of constraint objects. If no additional constraints are found, return [].
+Return a JSON object with a "constraints" key containing an array of constraint objects.
+Example: {"constraints": [...]}
+If no additional constraints are found, return {"constraints": []}.
 Only include constraints you are reasonably confident about (confidence >= 0.5).
 Do NOT repeat constraints that are already in the deterministic list provided."""
 
@@ -51,7 +53,7 @@ Already-determined constraints (DO NOT repeat these):
 Relevant regulatory text passages:
 {regulatory_text}
 
-Identify any ADDITIONAL constraints not covered above. Return as JSON array."""
+Identify any ADDITIONAL constraints not covered above. Return as a JSON object with a "constraints" key."""
 
 
 class RegulatoryRetriever:
@@ -67,22 +69,26 @@ class RegulatoryRetriever:
         """Hybrid search: metadata filter + vector similarity."""
         query_embedding = await self.llm.embed_single(query)
 
-        zone_filter = "'{" + ",".join(zone_codes + ["GENERAL"]) + "}'"
+        zone_array = zone_codes + ["GENERAL"]
 
-        sql = text(f"""
+        sql = text("""
             SELECT
                 id, chunk_text, section_number, topic, zone_codes,
-                embedding <=> :embedding::vector AS distance
+                embedding <=> CAST(:embedding AS vector) AS distance
             FROM regulatory_chunks
-            WHERE zone_codes && {zone_filter}::text[]
+            WHERE zone_codes && :zone_filter
               AND embedding IS NOT NULL
-            ORDER BY embedding <=> :embedding::vector
+            ORDER BY embedding <=> CAST(:embedding AS vector)
             LIMIT :limit
-        """)
+        """).bindparams(bindparam("zone_filter", type_=ARRAY(String)))
 
         result = await self.db.execute(
             sql,
-            {"embedding": str(query_embedding), "limit": limit},
+            {
+                "embedding": str(query_embedding),
+                "zone_filter": zone_array,
+                "limit": limit,
+            },
         )
         rows = result.fetchall()
 
@@ -159,13 +165,13 @@ class RegulatoryRetriever:
             if not isinstance(parsed, list):
                 parsed = []
 
-        except (json.JSONDecodeError, Exception) as e:
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
             logger.error(f"Layer 3 LLM interpretation failed: {e}")
             return []
 
         constraints = []
         for item in parsed:
-            confidence = float(item.get("confidence", 0.7))
+            confidence = self._safe_float(item.get("confidence")) or 0.7
             if confidence < 0.5:
                 continue
 

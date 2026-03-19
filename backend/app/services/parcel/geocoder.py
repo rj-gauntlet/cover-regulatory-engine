@@ -1,5 +1,6 @@
 """Mapbox Geocoding API client."""
 import logging
+from urllib.parse import quote
 
 import httpx
 
@@ -10,6 +11,8 @@ logger = logging.getLogger(__name__)
 MAPBOX_GEOCODE_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places"
 
 LA_BBOX = [-118.67, 33.70, -118.15, 34.34]
+
+_client = httpx.AsyncClient(timeout=30)
 
 
 async def geocode_address(address: str) -> dict | None:
@@ -23,10 +26,10 @@ async def geocode_address(address: str) -> dict | None:
         return None
 
     query = address
-    if "los angeles" not in address.lower() and "la" not in address.lower():
+    if "los angeles" not in address.lower():
         query = f"{address}, Los Angeles, CA"
 
-    url = f"{MAPBOX_GEOCODE_URL}/{query}.json"
+    url = f"{MAPBOX_GEOCODE_URL}/{quote(query)}.json"
     params = {
         "access_token": settings.mapbox_access_token,
         "types": "address",
@@ -34,14 +37,13 @@ async def geocode_address(address: str) -> dict | None:
         "limit": 1,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-        except httpx.HTTPError as e:
-            logger.error(f"Geocoding failed: {e}")
-            return None
+    try:
+        response = await _client.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+    except httpx.HTTPError as e:
+        logger.error(f"Geocoding failed: {e}")
+        return None
 
     features = data.get("features", [])
     if not features:

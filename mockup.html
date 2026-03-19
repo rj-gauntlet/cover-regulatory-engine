@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover Regulatory Engine — Design Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0a0a0a;
+    --charcoal: #1a1a1a;
+    --dark-gray: #2a2a2a;
+    --mid-gray: #4a4a4a;
+    --gray: #7a7a7a;
+    --light-gray: #b0b0b0;
+    --silver: #e0e0e0;
+    --off-white: #f5f5f3;
+    --white: #ffffff;
+    --warm-white: #fafaf8;
+    --accent: #c8a97e;
+    --accent-dim: rgba(200, 169, 126, 0.15);
+    --green: #4a9e6e;
+    --green-dim: rgba(74, 158, 110, 0.1);
+    --red: #c45c5c;
+    --orange: #c8956e;
+    --yellow: #c8b46e;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html, body { height: 100%; font-family: var(--font); background: var(--off-white); color: var(--black); }
+
+  /* ──────────── HEADER ──────────── */
+  .header {
+    height: 56px;
+    background: var(--black);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--dark-gray);
+  }
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--white);
+  }
+  .header-logo svg { width: 28px; height: 28px; }
+  .header-logo span {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--white);
+  }
+  .header-logo .subtitle {
+    font-weight: 300;
+    color: var(--gray);
+    font-size: 13px;
+    letter-spacing: 0;
+    margin-left: 4px;
+  }
+  .header-nav { display: flex; gap: 8px; }
+  .header-nav a {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--gray);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .header-nav a:hover, .header-nav a.active {
+    color: var(--white);
+    background: var(--dark-gray);
+  }
+
+  /* ──────────── MAIN LAYOUT ──────────── */
+  .main {
+    display: flex;
+    height: calc(100% - 56px);
+  }
+
+  /* ──────────── LEFT PANEL ──────────── */
+  .panel {
+    width: 460px;
+    flex-shrink: 0;
+    background: var(--white);
+    border-right: 1px solid var(--silver);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Search area */
+  .search-area {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--silver);
+  }
+  .search-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .search-input {
+    flex: 1;
+    padding: 10px 14px 10px 36px;
+    font-size: 13px;
+    font-family: var(--font);
+    border: 1px solid var(--silver);
+    border-radius: 6px;
+    background: var(--warm-white);
+    color: var(--black);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--mid-gray); }
+  .search-input::placeholder { color: var(--light-gray); }
+  .search-wrapper {
+    position: relative;
+    flex: 1;
+  }
+  .search-wrapper svg {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: var(--light-gray);
+  }
+  .search-btn {
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--black);
+    color: var(--white);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .search-btn:hover { background: var(--charcoal); }
+
+  /* Building type pills */
+  .type-pills {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .pill {
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--font);
+    letter-spacing: 0.3px;
+    border: 1px solid var(--silver);
+    border-radius: 100px;
+    background: transparent;
+    color: var(--mid-gray);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pill:hover { border-color: var(--mid-gray); color: var(--black); }
+  .pill.active {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+  }
+
+  /* Project inputs */
+  .project-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+  }
+  .input-group label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--gray);
+    margin-bottom: 4px;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .stepper button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--silver);
+    border-radius: 4px;
+    background: var(--warm-white);
+    font-size: 14px;
+    color: var(--mid-gray);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font);
+  }
+  .stepper input {
+    width: 40px;
+    text-align: center;
+    font-size: 13px;
+    font-family: var(--font);
+    border: 1px solid var(--silver);
+    border-radius: 4px;
+    padding: 4px;
+    color: var(--black);
+    background: var(--white);
+  }
+  .input-group input[type="number"]:not(.stepper input) {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: var(--font);
+    border: 1px solid var(--silver);
+    border-radius: 4px;
+    color: var(--black);
+  }
+
+  /* ──────────── ASSESSMENT PANEL ──────────── */
+  .assessment {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Assessment header */
+  .assess-header {
+    padding: 16px 24px;
+    background: var(--warm-white);
+    border-bottom: 1px solid var(--silver);
+  }
+  .assess-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .assess-address {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--black);
+    letter-spacing: -0.2px;
+  }
+  .assess-meta {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 3px;
+  }
+  .assess-meta strong { color: var(--mid-gray); font-weight: 600; }
+  .confidence {
+    text-align: right;
+  }
+  .confidence-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: -1px;
+  }
+  .confidence-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray);
+  }
+  .assess-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .badge-verified {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .badge-interpreted {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .badge-type {
+    color: var(--gray);
+    font-weight: 400;
+  }
+  .geojson-btn {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--silver);
+    border-radius: 4px;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 500;
+    font-family: var(--font);
+    color: var(--gray);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .geojson-btn:hover { border-color: var(--mid-gray); color: var(--black); }
+  .geojson-btn svg { width: 12px; height: 12px; }
+
+  /* Constraint categories */
+  .category {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .category-title {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--gray);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .category-title .count {
+    font-weight: 400;
+    color: var(--light-gray);
+  }
+
+  /* Constraint cards */
+  .constraint {
+    border: 1px solid var(--silver);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .constraint:hover { border-color: var(--light-gray); }
+  .constraint-bar {
+    width: 3px;
+    border-radius: 3px;
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+  }
+  .constraint-header {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    position: relative;
+    padding-left: 20px;
+  }
+  .constraint-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--green);
+  }
+  .constraint-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--black);
+    line-height: 1.4;
+    letter-spacing: -0.1px;
+  }
+  .constraint-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .constraint-badge {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--green);
+  }
+  .constraint-conf {
+    font-size: 9px;
+    color: var(--light-gray);
+  }
+  .chevron {
+    width: 16px;
+    height: 16px;
+    color: var(--light-gray);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* Expanded constraint detail */
+  .constraint-detail {
+    padding: 0 16px 14px 20px;
+    border-top: 1px solid var(--silver);
+    margin-top: 0;
+    padding-top: 12px;
+  }
+  .detail-section {
+    margin-bottom: 12px;
+  }
+  .detail-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray);
+    margin-bottom: 4px;
+  }
+  .detail-text {
+    font-size: 12px;
+    color: var(--mid-gray);
+    line-height: 1.6;
+  }
+  .citation {
+    background: var(--warm-white);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .citation-ref {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mid-gray);
+  }
+  .citation-quote {
+    font-size: 11px;
+    color: var(--gray);
+    font-style: italic;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+  }
+  .feedback-row span { font-size: 10px; color: var(--light-gray); }
+  .feedback-btn {
+    background: none;
+    border: 1px solid var(--silver);
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--light-gray);
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .feedback-btn:hover { border-color: var(--mid-gray); color: var(--mid-gray); }
+
+  /* Chat toggle */
+  .chat-toggle {
+    padding: 16px 24px;
+    border-top: 1px solid var(--silver);
+  }
+  .chat-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font);
+    color: var(--mid-gray);
+    background: var(--warm-white);
+    border: 1px solid var(--silver);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.2px;
+  }
+  .chat-btn:hover { border-color: var(--mid-gray); color: var(--black); }
+  .chat-btn svg { width: 16px; height: 16px; }
+
+  /* ──────────── MAP AREA ──────────── */
+  .map-area {
+    flex: 1;
+    background: #e8e4df;
+    position: relative;
+    overflow: hidden;
+  }
+  .map-placeholder {
+    width: 100%;
+    height: 100%;
+    background:
+      linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .map-inner {
+    text-align: center;
+    color: var(--gray);
+  }
+  .map-inner p { font-size: 13px; }
+
+  /* Map legend */
+  .legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--silver);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 160px;
+  }
+  .legend-title {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--gray);
+    margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .legend-swatch.line {
+    height: 0;
+    border-top: 2px dashed;
+  }
+  .legend-label {
+    font-size: 11px;
+    color: var(--mid-gray);
+  }
+
+  /* Parcel overlay mock */
+  .parcel-mock {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 320px;
+    border: 2.5px dashed var(--charcoal);
+    background: rgba(10,10,10,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .setback-front {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: rgba(196, 92, 92, 0.15);
+    border-bottom: 1px solid rgba(196, 92, 92, 0.3);
+  }
+  .setback-rear {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: rgba(200, 149, 110, 0.15);
+    border-top: 1px solid rgba(200, 149, 110, 0.3);
+  }
+  .setback-side-l {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 25px;
+    background: rgba(200, 180, 110, 0.15);
+    border-right: 1px solid rgba(200, 180, 110, 0.3);
+  }
+  .setback-side-r {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 25px;
+    background: rgba(200, 180, 110, 0.15);
+    border-left: 1px solid rgba(200, 180, 110, 0.3);
+  }
+  .buildable {
+    position: absolute;
+    top: 52px;
+    bottom: 52px;
+    left: 27px;
+    right: 27px;
+    border: 1.5px dashed var(--green);
+    background: rgba(74, 158, 110, 0.06);
+  }
+  .setback-label {
+    position: absolute;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--mid-gray);
+    background: rgba(255,255,255,0.85);
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+  }
+  .label-front { top: 16px; left: 50%; transform: translateX(-50%); }
+  .label-rear { bottom: 16px; left: 50%; transform: translateX(-50%); }
+  .label-side-l { left: 2px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+  .label-side-r { right: 2px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+
+  /* ──────────── CHAT PANEL (overlay mockup) ──────────── */
+  .chat-panel-mock {
+    position: absolute;
+    right: 480px;
+    top: 0;
+    bottom: 0;
+    width: 380px;
+    background: var(--white);
+    border-left: 1px solid var(--silver);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    display: none;
+  }
+  .chat-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--silver);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chat-header h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--black);
+  }
+  .chat-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--light-gray);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .chat-close:hover { background: var(--warm-white); color: var(--mid-gray); }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .msg {
+    margin-bottom: 12px;
+    display: flex;
+  }
+  .msg.user { justify-content: flex-end; }
+  .msg.assistant { justify-content: flex-start; }
+  .msg-bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .msg.user .msg-bubble {
+    background: var(--black);
+    color: var(--white);
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant .msg-bubble {
+    background: var(--warm-white);
+    color: var(--black);
+    border: 1px solid var(--silver);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-input-area {
+    padding: 14px 20px;
+    border-top: 1px solid var(--silver);
+    display: flex;
+    gap: 8px;
+  }
+  .chat-input {
+    flex: 1;
+    padding: 9px 14px;
+    border: 1px solid var(--silver);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    background: var(--warm-white);
+  }
+  .chat-input:focus { border-color: var(--mid-gray); }
+  .chat-send {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--black);
+    color: var(--white);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-send:hover { background: var(--charcoal); }
+
+  /* ──────────── SCROLLBAR ──────────── */
+  .assessment::-webkit-scrollbar { width: 4px; }
+  .assessment::-webkit-scrollbar-track { background: transparent; }
+  .assessment::-webkit-scrollbar-thumb { background: var(--silver); border-radius: 4px; }
+  .assessment::-webkit-scrollbar-thumb:hover { background: var(--light-gray); }
+
+  /* ──────────── ANNOTATION ──────────── */
+  .annotation {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--black);
+    color: var(--gray);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 11px;
+    z-index: 999;
+    letter-spacing: 0.3px;
+  }
+  .annotation strong { color: var(--white); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <a class="header-logo" href="#">
+    <svg viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="6" fill="#fff"/>
+      <path d="M18 8.5C18 7.12 16.88 6 15.5 6H12.5C9.46 6 7 8.46 7 11.5V16.5C7 19.54 9.46 22 12.5 22H15.5C16.88 22 18 20.88 18 19.5" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <span>Cover <span class="subtitle">Regulatory Engine</span></span>
+  </a>
+  <nav class="header-nav">
+    <a href="#" class="active">Assessment</a>
+    <a href="#">Admin</a>
+  </nav>
+</header>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <div class="search-area">
+      <div class="search-form">
+        <div class="search-wrapper">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+          </svg>
+          <input class="search-input" type="text" value="11348 Elderwood St, Los Angeles" />
+        </div>
+        <button class="search-btn">Assess</button>
+      </div>
+      <div class="type-pills">
+        <button class="pill active">Single Family Home</button>
+        <button class="pill">ADU</button>
+        <button class="pill">Guest House</button>
+      </div>
+      <div class="project-inputs">
+        <div class="input-group">
+          <label>Stories</label>
+          <div class="stepper">
+            <button>−</button>
+            <input type="number" value="2" />
+            <button>+</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Bedrooms</label>
+          <div class="stepper">
+            <button>−</button>
+            <input type="number" value="3" />
+            <button>+</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Bathrooms</label>
+          <div class="stepper">
+            <button>−</button>
+            <input type="number" value="2" />
+            <button>+</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Proposed Sqft</label>
+          <input type="number" placeholder="e.g. 1,500" style="width:100%;padding:6px 10px;font-size:13px;font-family:var(--font);border:1px solid var(--silver);border-radius:4px;color:var(--black);background:var(--white);" />
+        </div>
+      </div>
+    </div>
+
+    <div class="assessment">
+      <!-- Assessment header -->
+      <div class="assess-header">
+        <div class="assess-header-top">
+          <div>
+            <div class="assess-address">11348 Elderwood Street</div>
+            <div class="assess-meta">
+              Zone: <strong>R1-1</strong>
+              <span style="margin-left:12px">Lot: <strong>5,249 sqft</strong></span>
+            </div>
+          </div>
+          <div class="confidence">
+            <div class="confidence-value">100%</div>
+            <div class="confidence-label">Confidence</div>
+          </div>
+        </div>
+        <div class="assess-badges">
+          <span class="badge badge-verified">11 deterministic</span>
+          <span class="badge badge-type">SFH</span>
+          <button class="geojson-btn">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            GeoJSON
+          </button>
+        </div>
+      </div>
+
+      <!-- SETBACK category -->
+      <div class="category">
+        <div class="category-title">
+          ↔ Setbacks <span class="count">(3)</span>
+        </div>
+
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Front Setback: 20.0 ft</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+          <div class="constraint-detail">
+            <div class="detail-section">
+              <div class="detail-label">Reasoning</div>
+              <div class="detail-text">R1 zone requires a minimum 20-foot front yard setback per LAMC Section 12.08 C.1. This is a deterministic rule that applies uniformly to all R1-zoned parcels.</div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Citation</div>
+              <div class="citation">
+                <div class="citation-ref">LAMC §12.08 C.1 — Front Yard</div>
+                <div class="citation-quote">"Every lot in an R1 Zone shall have a front yard of not less than 20 percent of the depth of the lot, but such front yard need not exceed 20 feet."</div>
+              </div>
+            </div>
+            <div class="feedback-row">
+              <span>Helpful?</span>
+              <button class="feedback-btn">👍</button>
+              <button class="feedback-btn">👎</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Rear Setback: 15.0 ft</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Side Setback: 5.0 ft</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- HEIGHT category -->
+      <div class="category">
+        <div class="category-title">
+          ↕ Height <span class="count">(2)</span>
+        </div>
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Max Height: 33.0 ft</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Max Stories: 2.0 stories</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOOR AREA category -->
+      <div class="category">
+        <div class="category-title">
+          □ Floor Area <span class="count">(2)</span>
+        </div>
+        <div class="constraint">
+          <div class="constraint-header">
+            <div>
+              <div class="constraint-text">Max FAR: 0.45 ratio</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge">Verified</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="constraint">
+          <div class="constraint-header" style="position:relative;">
+            <div style="position:relative;">
+              <div class="constraint-text">Maximum Floor Area: 2,362 sqft</div>
+              <div class="constraint-meta">
+                <span class="constraint-badge" style="color:var(--accent);">Computed</span>
+                <span class="constraint-conf">100% confidence</span>
+              </div>
+            </div>
+            <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat toggle -->
+      <div class="chat-toggle">
+        <button class="chat-btn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/>
+          </svg>
+          Ask a follow-up question
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP AREA -->
+  <div class="map-area">
+    <div class="map-placeholder">
+      <!-- Parcel overlay mock -->
+      <div class="parcel-mock">
+        <div class="setback-front"></div>
+        <div class="setback-rear"></div>
+        <div class="setback-side-l"></div>
+        <div class="setback-side-r"></div>
+        <div class="buildable"></div>
+        <span class="setback-label label-front">20 ft</span>
+        <span class="setback-label label-rear">15 ft</span>
+        <span class="setback-label label-side-l">5 ft</span>
+        <span class="setback-label label-side-r">5 ft</span>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-item">
+        <div class="legend-swatch line" style="border-color: var(--charcoal);"></div>
+        <span class="legend-label">Parcel Boundary</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: rgba(196,92,92,0.2); border: 1px solid var(--red);"></div>
+        <span class="legend-label">Front Setback</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: rgba(200,149,110,0.2); border: 1px solid var(--orange);"></div>
+        <span class="legend-label">Rear Setback</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: rgba(200,180,110,0.2); border: 1px solid var(--yellow);"></div>
+        <span class="legend-label">Side Setback</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background: rgba(74,158,110,0.1); border: 1px solid var(--green);"></div>
+        <span class="legend-label">Buildable Area</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="annotation">
+  <strong>Design Mockup</strong> — Cover Regulatory Engine styled to match buildcover.com
+</div>
+
+</body>
+</html>

@@ -1,10 +1,7 @@
 """Geometry engine: compute setback polygons and buildable area from parcel + rules."""
 import logging
-import json
 
-from shapely.geometry import shape, mapping, Polygon, MultiPolygon
-from shapely.ops import unary_union
-from shapely import affinity
+from shapely.geometry import shape, mapping, Polygon
 
 from app.models.schemas import ConstraintSchema, ParcelSchema
 
@@ -27,7 +24,6 @@ class GeometryEngine:
         Returns a dict with:
         - setback_lines: GeoJSON FeatureCollection of individual setback areas
         - buildable_area: GeoJSON of the buildable envelope
-        - parcel_area_sqft: computed parcel area
         """
         if not parcel.geometry_geojson:
             return {"setback_lines": None, "buildable_area": None}
@@ -43,7 +39,6 @@ class GeometryEngine:
 
         setback_values = self._extract_setback_values(constraints)
         setback_features = []
-        buildable = parcel_geom
 
         front = setback_values.get("front_setback", 20.0)
         rear = setback_values.get("rear_setback", 15.0)
@@ -60,7 +55,6 @@ class GeometryEngine:
                 },
                 "geometry": mapping(front_buffer),
             })
-            buildable = buildable.difference(front_buffer)
 
         rear_buffer = self._create_setback_buffer(parcel_geom, rear, "rear")
         if rear_buffer and not rear_buffer.is_empty:
@@ -73,7 +67,6 @@ class GeometryEngine:
                 },
                 "geometry": mapping(rear_buffer),
             })
-            buildable = buildable.difference(rear_buffer)
 
         side_buffer = self._create_setback_buffer(parcel_geom, side, "side")
         if side_buffer and not side_buffer.is_empty:
@@ -86,11 +79,9 @@ class GeometryEngine:
                 },
                 "geometry": mapping(side_buffer),
             })
-            buildable = buildable.difference(side_buffer)
 
-        overall_buffer = self._buffer_inward(parcel_geom, front, rear, side)
-        if overall_buffer and not overall_buffer.is_empty and overall_buffer.is_valid:
-            buildable = overall_buffer
+        # Buildable area: single inward buffer approximating all setbacks
+        buildable = self._buffer_inward(parcel_geom, front, rear, side)
 
         buildable_geojson = None
         if buildable and not buildable.is_empty:
@@ -126,8 +117,13 @@ class GeometryEngine:
 
         Uses a simplified approach: buffer the entire parcel inward,
         then take the difference to get the setback area.
+        Side (east-west) setbacks use the longitude conversion factor;
+        front/rear (north-south) setbacks use the latitude factor.
         """
-        buffer_deg = distance_ft * FEET_TO_DEGREES_LAT
+        if side == "side":
+            buffer_deg = distance_ft * FEET_TO_DEGREES_LNG
+        else:
+            buffer_deg = distance_ft * FEET_TO_DEGREES_LAT
 
         try:
             inner = parcel.buffer(-buffer_deg)
@@ -146,15 +142,21 @@ class GeometryEngine:
         rear_ft: float,
         side_ft: float,
     ) -> Polygon | None:
-        """Compute buildable area by buffering inward with the largest setback."""
-        max_setback = max(front_ft, rear_ft, side_ft)
-        buffer_deg = max_setback * FEET_TO_DEGREES_LAT
+        """Compute buildable area by buffering inward.
+
+        Uses the larger of the north-south (LAT) and east-west (LNG)
+        buffer distances so the isotropic buffer conservatively
+        approximates per-side setbacks.
+        """
+        ns_buffer_deg = max(front_ft, rear_ft) * FEET_TO_DEGREES_LAT
+        ew_buffer_deg = side_ft * FEET_TO_DEGREES_LNG
+        buffer_deg = max(ns_buffer_deg, ew_buffer_deg)
 
         try:
             inner = parcel.buffer(-buffer_deg)
             if inner.is_empty or not inner.is_valid:
-                min_setback = min(front_ft, rear_ft, side_ft)
-                inner = parcel.buffer(-min_setback * FEET_TO_DEGREES_LAT)
+                buffer_deg = min(ns_buffer_deg, ew_buffer_deg)
+                inner = parcel.buffer(-buffer_deg)
             return inner if not inner.is_empty else None
         except Exception as e:
             logger.error(f"Inward buffer failed: {e}")

@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     database_url: str = "postgresql+asyncpg://cover:cover@localhost:5432/cover"
     database_url_sync: str = "postgresql://cover:cover@localhost:5432/cover"
 
@@ -22,9 +24,7 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 128
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
 
 settings = Settings()

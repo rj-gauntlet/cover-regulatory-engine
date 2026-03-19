@@ -1,5 +1,6 @@
 """Chat API endpoints with SSE streaming."""
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, get_llm
+from app.core.database import async_session as session_factory
 from app.models.database import (
     Assessment as AssessmentDB,
     ChatSession,
@@ -16,7 +18,8 @@ from app.models.database import (
 )
 from app.models.schemas import ChatRequest, ChatMessageSchema
 from app.services.llm.base import LLMService
-from app.services.engine.retriever import RegulatoryRetriever
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -81,7 +84,8 @@ async def chat_with_assessment(
 
     constraints_context = "\n".join(
         f"- {c.parameter}: {c.value} (confidence: {c.confidence}, "
-        f"type: {c.determination_type}, source: LAMC Sec. {c.citations[0].get('section_number', 'N/A') if c.citations else 'N/A'})"
+        f"type: {c.determination_type}, source: LAMC Sec. "
+        f"{c.citations[0].get('section_number', 'N/A') if c.citations and isinstance(c.citations[0], dict) else 'N/A'})"
         for c in constraints
     )
 
@@ -93,23 +97,28 @@ async def chat_with_assessment(
     for msg in prev_messages:
         messages.append({"role": msg.role, "content": msg.content})
 
-    assistant_content_parts = []
+    session_id = chat_session.id
 
     async def generate():
-        async for token in llm.complete_stream(messages=messages, temperature=0.1):
-            assistant_content_parts.append(token)
-            yield f"data: {json.dumps({'token': token})}\n\n"
-        yield "data: [DONE]\n\n"
-
-        full_content = "".join(assistant_content_parts)
-        assistant_msg = ChatMessage(
-            session_id=chat_session.id,
-            role="assistant",
-            content=full_content,
-        )
-        db.add(assistant_msg)
-        await db.flush()
-        await db.commit()
+        full_response = ""
+        try:
+            async for token in llm.complete_stream(messages=messages, temperature=0.1):
+                full_response += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            logger.exception("LLM stream failed")
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        finally:
+            if full_response:
+                async with session_factory() as save_db:
+                    assistant_msg = ChatMessage(
+                        session_id=session_id,
+                        role="assistant",
+                        content=full_response,
+                    )
+                    save_db.add(assistant_msg)
+                    await save_db.commit()
 
     return StreamingResponse(
         generate(),

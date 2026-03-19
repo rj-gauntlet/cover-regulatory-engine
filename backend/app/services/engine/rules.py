@@ -20,6 +20,10 @@ class StructuredRuleLookup:
         self, zone_class: str, building_type: str = "SFH"
     ) -> list[ConstraintSchema]:
         """Look up all structured rules for a zone class and building type."""
+        if not zone_class:
+            logger.warning("zone_class is empty or None — skipping structured rule lookup")
+            return []
+
         result = await self.db.execute(
             select(ZoneRule).where(
                 ZoneRule.zone_class == zone_class,
