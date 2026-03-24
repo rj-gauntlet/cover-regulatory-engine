@@ -202,11 +202,15 @@ function addParcelLayers(assessment: Assessment) {
       })
     }
 
-    const labelFeatures = setbackConstraints.map(c => ({
-      type: 'Feature' as const,
-      properties: { label: c.value || '' },
-      geometry: { type: 'Point' as const, coordinates: computeCentroid(c.geometry_geojson!) },
-    }))
+    const labelFeatures = setbackConstraints.map(c => {
+      const name = (c.parameter || '').replace('_setback', '').replace(/_/g, ' ')
+      const displayName = name.charAt(0).toUpperCase() + name.slice(1)
+      return {
+        type: 'Feature' as const,
+        properties: { label: `${displayName}: ${c.value || ''}` },
+        geometry: { type: 'Point' as const, coordinates: computeCentroid(c.geometry_geojson!) },
+      }
+    })
     map.addSource('setback-labels', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: labelFeatures },
@@ -219,9 +223,12 @@ function addParcelLayers(assessment: Assessment) {
         'text-field': ['get', 'label'],
         'text-size': 11,
         'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-        'text-allow-overlap': true,
+        'text-allow-overlap': false,
+        'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'],
+        'text-radial-offset': 0.5,
+        'text-padding': 8,
       },
-      paint: { 'text-color': '#2a2a2a', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+      paint: { 'text-color': '#2a2a2a', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
     })
   }
 

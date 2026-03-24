@@ -78,7 +78,9 @@ class ParcelService:
             return None
 
         county_parcel = await self.county_parcels.get_parcel(lat, lng)
-        buildings = await self.county_buildings.get_buildings(lat, lng)
+
+        parcel_geom = county_parcel["geometry"] if county_parcel else None
+        buildings = await self.county_buildings.get_buildings_for_parcel(parcel_geom, lat, lng)
 
         if county_parcel:
             logger.info(

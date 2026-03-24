@@ -175,14 +175,25 @@ class LACountyBuildingClient:
     Returns building polygons with heights for structures within a parcel area.
     """
 
-    async def get_buildings(self, lat: float, lng: float, buffer: float = 0.0005) -> list[dict]:
-        """Get building footprints near a point.
+    async def get_buildings_for_parcel(
+        self, parcel_geometry: dict | None, lat: float, lng: float
+    ) -> list[dict]:
+        """Get building footprints that overlap the parcel boundary.
 
-        Returns a list of GeoJSON features with building polygons and metadata.
+        Uses the parcel bounding box to scope the ArcGIS query, then filters
+        results to only buildings whose centroid falls within the parcel polygon.
+        Falls back to a small buffer around the point if no parcel geometry.
         """
-        envelope = f"{lng - buffer},{lat - buffer},{lng + buffer},{lat + buffer}"
-        out_fields = "BLD_ID,HEIGHT,ELEV,CODE,STATUS,AREA,Shape_Area"
+        if parcel_geometry and parcel_geometry.get("type") == "Polygon":
+            coords = parcel_geometry["coordinates"][0]
+            lngs = [c[0] for c in coords]
+            lats = [c[1] for c in coords]
+            envelope = f"{min(lngs)},{min(lats)},{max(lngs)},{max(lats)}"
+        else:
+            buffer = 0.0002
+            envelope = f"{lng - buffer},{lat - buffer},{lng + buffer},{lat + buffer}"
 
+        out_fields = "BLD_ID,HEIGHT,ELEV,CODE,STATUS,AREA,Shape_Area"
         features = await _query_layer(BUILDING_FOOTPRINT_URL, envelope, out_fields)
         if not features:
             return []
@@ -192,6 +203,12 @@ class LACountyBuildingClient:
             geom = f.get("geometry")
             if not geom or geom.get("type") != "Polygon":
                 continue
+
+            if parcel_geometry and parcel_geometry.get("type") == "Polygon":
+                bld_centroid = _polygon_centroid(geom)
+                if not _point_in_polygon(bld_centroid, parcel_geometry):
+                    continue
+
             props = f.get("properties", {})
             buildings.append({
                 "type": "Feature",
@@ -215,3 +232,29 @@ class LACountyBuildingClient:
             return float(val)
         except (ValueError, TypeError):
             return None
+
+
+def _polygon_centroid(geom: dict) -> tuple[float, float]:
+    """Compute centroid of a GeoJSON Polygon as (lng, lat)."""
+    coords = geom.get("coordinates", [[]])[0]
+    if not coords:
+        return (0.0, 0.0)
+    cx = sum(c[0] for c in coords) / len(coords)
+    cy = sum(c[1] for c in coords) / len(coords)
+    return (cx, cy)
+
+
+def _point_in_polygon(point: tuple[float, float], polygon: dict) -> bool:
+    """Ray-casting point-in-polygon test for a GeoJSON Polygon."""
+    px, py = point
+    ring = polygon.get("coordinates", [[]])[0]
+    n = len(ring)
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i][0], ring[i][1]
+        xj, yj = ring[j][0], ring[j][1]
+        if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
