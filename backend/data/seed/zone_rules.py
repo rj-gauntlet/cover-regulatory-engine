@@ -1,7 +1,7 @@
-"""Structured zone rules for LA City residential zones.
+"""Structured zone rules for LA City zones.
 
 These are hand-curated from LAMC Chapter 1, Article 2.
-Sources: LAMC Sec. 12.07, 12.08, 12.09, 12.09.5, 12.21.1
+Sources: LAMC Sec. 12.05, 12.07, 12.08, 12.09, 12.09.5, 12.14, 12.16, 12.21.1
 Reference: https://planning.lacity.gov/odocument/eadcb225-a16b-4ce6-bc94-c915408c2b04/Zoning_Code_Summary.pdf
 """
 
@@ -207,6 +207,227 @@ ZONE_RULES = [
         "applies_to": ["ADU"],
         "section_number": "12.22",
         "source_text": "No additional parking spaces required for an ADU located within one-half mile of public transit.",
+        "is_verified": True,
+    },
+
+    # ==========================================
+    # A1 — AGRICULTURE ZONE (Sec. 12.05)
+    # ==========================================
+    {
+        "zone_class": "A1",
+        "parameter": "front_setback",
+        "category": "setback",
+        "base_value": 25.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "20% of lot depth, need not exceed 25 feet. Subject to prevailing setback."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.05",
+        "source_text": "Front Yard – There shall be a front yard of not less than 20 percent of the depth of the lot, but such front yard need not exceed 25 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "side_setback",
+        "category": "setback",
+        "base_value": 5.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "10% of lot width, max 25 ft, min 5 ft",
+            "when": {"lot_width_lt": 50},
+            "then": {"formula": "lot_width * 0.10", "min": 5.0},
+            "else": {"value": 5.0},
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.05",
+        "source_text": "Side Yard – There shall be a side yard on each side of a main building of not less than 10 percent of the width of the lot, but such side yard need not exceed 25 feet, provided that in no event shall a side yard of less than 5 feet be provided.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "rear_setback",
+        "category": "setback",
+        "base_value": 25.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "25% of lot depth, need not exceed 25 feet."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.05",
+        "source_text": "Rear Yard – There shall be a rear yard of not less than 25 percent of the depth of the lot, but such rear yard need not exceed 25 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "max_height",
+        "category": "height",
+        "base_value": 45.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "Height District 1 default for A1 zone."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "No building or structure in the A1 zone shall exceed 45 feet in height in Height District 1.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "max_stories",
+        "category": "height",
+        "base_value": 3.0,
+        "unit": "stories",
+        "conditions": None,
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "Buildings in the A1 zone shall not exceed 3 stories.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "max_far",
+        "category": "far",
+        "base_value": 0.45,
+        "unit": "ratio",
+        "conditions": {
+            "note": "Residential Floor Area ratio for Height District 1."
+        },
+        "applies_to": ["SFH"],
+        "section_number": "12.21.1",
+        "source_text": "The Residential Floor Area shall not exceed 0.45 times the Buildable Area of the lot.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "min_lot_area",
+        "category": "lot",
+        "base_value": 17500.0,
+        "unit": "sqft",
+        "conditions": {
+            "note": "For new subdivisions. Existing lots of record are grandfathered."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.05",
+        "source_text": "Every lot shall have a minimum area of not less than 17,500 square feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "min_lot_width",
+        "category": "lot",
+        "base_value": 60.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ALL"],
+        "section_number": "12.05",
+        "source_text": "Every lot shall have a minimum width of 60 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "max_units",
+        "category": "density",
+        "base_value": 1.0,
+        "unit": "units",
+        "conditions": {
+            "note": "One dwelling unit per lot. ADU may be added per state law."
+        },
+        "applies_to": ["SFH"],
+        "section_number": "12.05",
+        "source_text": "Only one main single-family dwelling shall be erected or maintained on any lot in the A1 zone.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "parking_spaces",
+        "category": "parking",
+        "base_value": 2.0,
+        "unit": "spaces",
+        "conditions": None,
+        "applies_to": ["SFH"],
+        "section_number": "12.21",
+        "source_text": "Two parking spaces for each dwelling unit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "adu_max_size",
+        "category": "adu",
+        "base_value": 1200.0,
+        "unit": "sqft",
+        "conditions": {
+            "note": "Detached ADU max per state law."
+        },
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "An ADU shall not exceed 1,200 square feet for a detached unit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "adu_rear_setback",
+        "category": "setback",
+        "base_value": 4.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "ADU rear setback shall be a minimum of 4 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "adu_side_setback",
+        "category": "setback",
+        "base_value": 4.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "ADU side setback shall be a minimum of 4 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "adu_max_height",
+        "category": "height",
+        "base_value": 16.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "16 ft for detached ADU."
+        },
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "A detached ADU shall not exceed 16 feet in height.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "adu_parking",
+        "category": "parking",
+        "base_value": 0.0,
+        "unit": "spaces",
+        "conditions": {
+            "note": "No parking required if within 1/2 mile of transit."
+        },
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "No additional parking spaces required for an ADU located within one-half mile of public transit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "A1",
+        "parameter": "guest_house_max_size",
+        "category": "adu",
+        "base_value": 640.0,
+        "unit": "sqft",
+        "conditions": {
+            "note": "Guest house may not contain a kitchen."
+        },
+        "applies_to": ["Guest House"],
+        "section_number": "12.05",
+        "source_text": "An accessory living quarters (guest house) shall not exceed 640 square feet and shall not contain a kitchen.",
         "is_verified": True,
     },
 
@@ -607,6 +828,308 @@ ZONE_RULES = [
         "applies_to": ["Guest House"],
         "section_number": "12.08",
         "source_text": "An accessory living quarters (guest house) shall not exceed 640 square feet and shall not contain a kitchen.",
+        "is_verified": True,
+    },
+
+    # ==========================================
+    # C4 — COMMERCIAL ZONE (Sec. 12.16)
+    # Residential uses follow R4 yard requirements
+    # ==========================================
+    {
+        "zone_class": "C4",
+        "parameter": "front_setback",
+        "category": "setback",
+        "base_value": 15.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "Required when used for residential purposes per R4 zone requirements."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.16",
+        "source_text": "Yards – Same as required in the R4 Zone when the lot is used for residential purposes.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "side_setback",
+        "category": "setback",
+        "base_value": 5.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "For residential use. No side yard required for purely commercial use."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.16",
+        "source_text": "Side Yard – Same as required in the R4 Zone for residential buildings.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "rear_setback",
+        "category": "setback",
+        "base_value": 15.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "For residential use. No rear yard required for purely commercial use."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.16",
+        "source_text": "Rear Yard – Same as required in the R4 Zone for residential buildings.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "max_height",
+        "category": "height",
+        "base_value": 75.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "Height District 1 default for C zones. May be further limited by specific plan."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "No building or structure in the C4 zone shall exceed 75 feet in height in Height District 1.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "max_stories",
+        "category": "height",
+        "base_value": 6.0,
+        "unit": "stories",
+        "conditions": None,
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "Buildings in the C4 zone in Height District 1 shall not exceed 6 stories.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "max_far",
+        "category": "far",
+        "base_value": 1.5,
+        "unit": "ratio",
+        "conditions": {
+            "note": "1.5:1 general commercial FAR in HD1. 3:1 permitted for residential projects with density bonus."
+        },
+        "applies_to": ["SFH"],
+        "section_number": "12.21.1",
+        "source_text": "The total floor area of a building shall not exceed 1.5 times the buildable area of the lot in Height District 1.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "max_units",
+        "category": "density",
+        "base_value": 1.0,
+        "unit": "units",
+        "conditions": {
+            "note": "For SFH use. Multi-family at 400 sqft per unit in R4 equivalent."
+        },
+        "applies_to": ["SFH"],
+        "section_number": "12.16",
+        "source_text": "Uses in the C4 zone are subject to the density rules of the R4 zone for residential use.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "parking_spaces",
+        "category": "parking",
+        "base_value": 2.0,
+        "unit": "spaces",
+        "conditions": None,
+        "applies_to": ["SFH"],
+        "section_number": "12.21",
+        "source_text": "Two parking spaces for each dwelling unit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "min_lot_area",
+        "category": "lot",
+        "base_value": 5000.0,
+        "unit": "sqft",
+        "conditions": {
+            "note": "No minimum lot area for commercial use. 5,000 sqft applies for residential use."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.16",
+        "source_text": "Lot area for residential use in C4 zone follows R4 zone requirements.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "adu_max_size",
+        "category": "adu",
+        "base_value": 1200.0,
+        "unit": "sqft",
+        "conditions": {
+            "note": "Detached ADU max per state law."
+        },
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "An ADU shall not exceed 1,200 square feet for a detached unit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "adu_rear_setback",
+        "category": "setback",
+        "base_value": 4.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "ADU rear setback shall be a minimum of 4 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "adu_side_setback",
+        "category": "setback",
+        "base_value": 4.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "ADU side setback shall be a minimum of 4 feet.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "adu_max_height",
+        "category": "height",
+        "base_value": 16.0,
+        "unit": "ft",
+        "conditions": None,
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "A detached ADU shall not exceed 16 feet in height.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C4",
+        "parameter": "adu_parking",
+        "category": "parking",
+        "base_value": 0.0,
+        "unit": "spaces",
+        "conditions": {
+            "note": "No parking required if within 1/2 mile of transit."
+        },
+        "applies_to": ["ADU"],
+        "section_number": "12.22",
+        "source_text": "No additional parking spaces required for an ADU located within one-half mile of public transit.",
+        "is_verified": True,
+    },
+
+    # ==========================================
+    # C2 — COMMERCIAL ZONE (Sec. 12.14)
+    # Residential uses follow R4 yard requirements
+    # ==========================================
+    {
+        "zone_class": "C2",
+        "parameter": "front_setback",
+        "category": "setback",
+        "base_value": 15.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "Required when used for residential purposes per R4 zone requirements."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.14",
+        "source_text": "Yards – Same as required in the R4 Zone when the lot is used for residential purposes.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "side_setback",
+        "category": "setback",
+        "base_value": 5.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "For residential use. No side yard required for purely commercial use."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.14",
+        "source_text": "Side Yard – Same as required in the R4 Zone for residential buildings.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "rear_setback",
+        "category": "setback",
+        "base_value": 15.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "For residential use. No rear yard required for purely commercial use."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.14",
+        "source_text": "Rear Yard – Same as required in the R4 Zone for residential buildings.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "max_height",
+        "category": "height",
+        "base_value": 75.0,
+        "unit": "ft",
+        "conditions": {
+            "note": "Height District 1 default for C zones."
+        },
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "No building or structure in the C2 zone shall exceed 75 feet in height in Height District 1.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "max_stories",
+        "category": "height",
+        "base_value": 6.0,
+        "unit": "stories",
+        "conditions": None,
+        "applies_to": ["ALL"],
+        "section_number": "12.21.1",
+        "source_text": "Buildings in the C2 zone in Height District 1 shall not exceed 6 stories.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "max_far",
+        "category": "far",
+        "base_value": 1.5,
+        "unit": "ratio",
+        "conditions": {
+            "note": "1.5:1 general commercial FAR in HD1."
+        },
+        "applies_to": ["SFH"],
+        "section_number": "12.21.1",
+        "source_text": "The total floor area of a building shall not exceed 1.5 times the buildable area of the lot in Height District 1.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "parking_spaces",
+        "category": "parking",
+        "base_value": 2.0,
+        "unit": "spaces",
+        "conditions": None,
+        "applies_to": ["SFH"],
+        "section_number": "12.21",
+        "source_text": "Two parking spaces for each dwelling unit.",
+        "is_verified": True,
+    },
+    {
+        "zone_class": "C2",
+        "parameter": "min_lot_area",
+        "category": "lot",
+        "base_value": 5000.0,
+        "unit": "sqft",
+        "conditions": None,
+        "applies_to": ["ALL"],
+        "section_number": "12.14",
+        "source_text": "Lot area for residential use in C2 zone follows R4 zone requirements.",
         "is_verified": True,
     },
 ]

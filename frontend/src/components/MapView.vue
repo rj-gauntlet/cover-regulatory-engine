@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import mapboxgl from 'mapbox-gl'
-import type { Assessment, Constraint } from '@/types'
+import type { Assessment, Constraint, NearbyParcel } from '@/types'
 
 const props = defineProps<{
   center: { lat: number; lng: number }
   assessment: Assessment | null
+  nearbyParcels?: NearbyParcel[]
+  searchedAddress?: string
 }>()
 
 const emit = defineEmits<{
@@ -129,12 +131,81 @@ watch(() => props.assessment, async (assessment) => {
   else map.once('style.load', () => addParcelLayers(assessment))
 }, { deep: true })
 
+watch(() => props.nearbyParcels, async (parcels) => {
+  if (!map || !parcels || parcels.length === 0) return
+  if (props.assessment) return
+  await nextTick()
+
+  const show = () => addNearbyAddressLabels(parcels, props.center)
+  if (map.isStyleLoaded()) show()
+  else map.once('style.load', show)
+}, { deep: true })
+
 function clearLayers() {
   if (!map) return
-  const layerIds = ['parcel-fill', 'parcel-outline', 'buildable-fill', 'buildable-outline', 'setback-front', 'setback-rear', 'setback-side', 'setback-labels', 'buildings-fill', 'buildings-outline']
+  const layerIds = [
+    'parcel-fill', 'parcel-outline', 'buildable-fill', 'buildable-outline',
+    'setback-front', 'setback-rear', 'setback-side', 'setback-labels',
+    'buildings-fill', 'buildings-outline',
+  ]
   const sourceIds = ['parcel', 'buildable', 'setbacks', 'setback-labels', 'buildings']
   for (const id of layerIds) { if (map.getLayer(id)) map.removeLayer(id) }
   for (const id of sourceIds) { if (map.getSource(id)) map.removeSource(id) }
+  clearNearbyMarkers()
+}
+
+let searchMarker: mapboxgl.Marker | null = null
+let nearbyMarkers: mapboxgl.Marker[] = []
+
+function clearNearbyMarkers() {
+  for (const m of nearbyMarkers) m.remove()
+  nearbyMarkers = []
+  if (searchMarker) { searchMarker.remove(); searchMarker = null }
+}
+
+function extractStreet(addr: string): string {
+  const cleaned = addr.toUpperCase().replace(/\s+/g, ' ').trim()
+  const m = cleaned.match(/^\d+\s+(.+?)(?:\s+(?:LOS ANGELES|LA)\b|,|$)/)
+  if (!m) return ''
+  return m[1]
+    .replace(/\s+APT.*/, '')
+    .replace(/^[NSEW]\s+/, '')
+    .replace(/\s+AVE(NUE)?$/, ' AVE')
+    .replace(/\s+ST(REET)?$/, ' ST')
+    .trim()
+}
+
+function addNearbyAddressLabels(parcels: NearbyParcel[], center: { lat: number; lng: number }) {
+  if (!map || parcels.length === 0) return
+  clearNearbyMarkers()
+
+  const searchedStreet = extractStreet(props.searchedAddress || '')
+
+  for (const p of parcels) {
+    const cleaned = p.address.replace(/\s+APT\s+\S*/i, '').replace(/\s+/g, ' ').trim()
+    const parcelStreet = extractStreet(cleaned)
+    const houseNum = cleaned.match(/^(\d+(\s*\d*\/\d+)?)/)?.[1] || ''
+    const isSameStreet = searchedStreet && parcelStreet === searchedStreet
+    const label = isSameStreet ? houseNum : cleaned.replace(/\s+(LOS ANGELES|LA)\s+CA\s*\d*/i, '').trim()
+
+    const el = document.createElement('div')
+    el.style.cssText = isSameStreet
+      ? 'font:bold 12px Inter,system-ui,sans-serif;color:#0a0a0a;background:#fff;padding:2px 5px;border-radius:4px;border:1.5px solid #1a1a1a;white-space:nowrap;pointer-events:auto;cursor:default;box-shadow:0 1px 3px rgba(0,0,0,.15);'
+      : 'font:10px Inter,system-ui,sans-serif;color:#7a7a7a;background:#fff;padding:1px 4px;border-radius:3px;border:1px solid #ddd;white-space:nowrap;pointer-events:none;'
+    el.textContent = label
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'top', offset: [0, 4] })
+      .setLngLat([p.lng, p.lat])
+      .addTo(map)
+    nearbyMarkers.push(marker)
+  }
+
+  const pin = document.createElement('div')
+  pin.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#c45c5c;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;'
+  searchMarker = new mapboxgl.Marker({ element: pin })
+    .setLngLat([center.lng, center.lat])
+    .setPopup(new mapboxgl.Popup({ offset: 12 }).setText('Searched location (no parcel found)'))
+    .addTo(map)
 }
 
 function addParcelLayers(assessment: Assessment) {

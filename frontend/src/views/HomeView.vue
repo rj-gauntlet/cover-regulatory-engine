@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
-import type { Assessment } from '@/types'
+import type { Assessment, NearbyParcel } from '@/types'
 import AddressSearch from '@/components/AddressSearch.vue'
 import MapView from '@/components/MapView.vue'
 import AssessmentPanel from '@/components/AssessmentPanel.vue'
 import ChatPanel from '@/components/ChatPanel.vue'
 import ProjectInputs from '@/components/ProjectInputs.vue'
 import type { ProjectInputsModel } from '@/components/ProjectInputs.vue'
-import { api } from '@/services/api'
+import { api, ParcelNotFoundError } from '@/services/api'
 
 const assessment = ref<Assessment | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const searchedLocation = ref<{ lat: number; lng: number } | null>(null)
+const nearbyParcels = ref<NearbyParcel[]>([])
 const buildingType = ref('SFH')
 const showChat = ref(false)
 const panelCollapsed = ref(false)
@@ -37,6 +39,8 @@ async function handleSearch(searchAddress?: string) {
   loading.value = true
   error.value = null
   assessment.value = null
+  searchedLocation.value = null
+  nearbyParcels.value = []
   showChat.value = false
   panelCollapsed.value = false
 
@@ -47,6 +51,11 @@ async function handleSearch(searchAddress?: string) {
       project_inputs: projectInputs.value,
     })
   } catch (e: any) {
+    const notFound = e instanceof ParcelNotFoundError ? e : (e?.name === 'ParcelNotFoundError' ? e : null)
+    if (notFound?.data?.geocoded_lat != null) {
+      searchedLocation.value = { lat: notFound.data.geocoded_lat, lng: notFound.data.geocoded_lng }
+      nearbyParcels.value = notFound.data.nearby_parcels || []
+    }
     error.value = e.message || 'Assessment failed. Please try another address.'
   } finally {
     loading.value = false
@@ -82,6 +91,9 @@ const mapCenter = computed(() => {
       lat: assessment.value.parcel.centroid_lat || 34.0522,
       lng: assessment.value.parcel.centroid_lng || -118.2437,
     }
+  }
+  if (searchedLocation.value) {
+    return searchedLocation.value
   }
   return { lat: 34.0522, lng: -118.2437 }
 })
@@ -204,7 +216,7 @@ const mapCenter = computed(() => {
 
     <!-- Map -->
     <div class="flex-1 min-h-[300px]">
-      <MapView :center="mapCenter" :assessment="assessment" />
+      <MapView :center="mapCenter" :assessment="assessment" :nearby-parcels="nearbyParcels" :searched-address="address" />
     </div>
   </div>
 </template>

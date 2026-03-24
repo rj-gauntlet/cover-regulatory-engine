@@ -13,6 +13,7 @@ from app.services.engine.rules import StructuredRuleLookup
 from app.services.engine.compute import ComputationEngine
 from app.services.engine.retriever import RegulatoryRetriever
 from app.services.engine.geometry import GeometryEngine
+from app.services.engine.auto_seed import auto_seed_zone_rules
 from app.services.llm.base import LLMService
 
 logger = logging.getLogger(__name__)
@@ -22,12 +23,15 @@ class RuleResolver:
     """Orchestrates the three-layer rule resolution engine.
 
     Layer 1: Deterministic lookup from ZoneRule table
+    Layer 1b: Auto-seed — if Layer 1 returns nothing, fetch LAMC section,
+              extract rules via LLM, save to zone_rules, then re-run Layer 1.
     Layer 2: Conditional computation against parcel dimensions
     Layer 3: RAG + LLM interpretation for ambiguous regulations
     """
 
     def __init__(self, db: AsyncSession, llm: LLMService):
         self.db = db
+        self.llm = llm
         self.rules = StructuredRuleLookup(db)
         self.compute = ComputationEngine()
         self.retriever = RegulatoryRetriever(db, llm)
@@ -51,6 +55,16 @@ class RuleResolver:
         # Layer 1: Deterministic lookup
         constraints = await self.rules.lookup(parcel.zone_class, building_type)
         logger.info(f"Layer 1 produced {len(constraints)} constraints")
+
+        # Layer 1b: Auto-seed if Layer 1 found nothing
+        if not constraints and parcel.zone_class:
+            try:
+                seeded = await auto_seed_zone_rules(parcel.zone_class, self.db, self.llm)
+                if seeded > 0:
+                    constraints = await self.rules.lookup(parcel.zone_class, building_type)
+                    logger.info(f"Layer 1b auto-seeded {seeded} rules, re-lookup produced {len(constraints)} constraints")
+            except Exception as e:
+                logger.warning(f"Auto-seed failed for {parcel.zone_class}: {e}")
 
         # Layer 2: Conditional computation
         constraints = self.compute.refine_constraints(constraints, parcel, building_type)

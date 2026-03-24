@@ -13,6 +13,7 @@ from app.models.database import (  # noqa: F401
     UserFeedback, IngestionLog,
 )
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 

@@ -79,21 +79,48 @@ async def pipeline_logs(
 
 
 @router.post("/pipeline/trigger")
-async def trigger_ingestion(db: AsyncSession = Depends(get_session)):
+async def trigger_ingestion(
+    mode: str = Query(default="auto", enum=["auto", "scrape", "llm"]),
+    db: AsyncSession = Depends(get_session),
+):
     """Manually trigger a re-ingestion of regulatory data.
 
-    WARNING: This is a long-running operation that may take several minutes.
+    Modes:
+    - auto: try scraper first, fall back to LLM-based generation
+    - scrape: only use the HTML scraper (amlegal.com)
+    - llm: only use LLM-generated regulatory text
     """
-    from app.services.ingestion.embedder import run_full_ingestion
-    try:
-        stats = await run_full_ingestion(db)
-    except Exception as exc:
-        logger.exception("Ingestion failed")
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}")
+    from app.services.ingestion.embedder import run_full_ingestion, run_llm_ingestion
+
+    stats = None
+    method_used = ""
+
+    if mode in ("auto", "scrape"):
+        try:
+            stats = await run_full_ingestion(db)
+            method_used = "scrape"
+            if stats.get("sections_scraped", 0) == 0 and mode == "auto":
+                stats = None
+        except Exception as exc:
+            logger.warning(f"Scraper failed: {exc}")
+            if mode == "scrape":
+                raise HTTPException(status_code=500, detail=f"Scrape ingestion failed: {exc}")
+
+    if stats is None and mode in ("auto", "llm"):
+        try:
+            stats = await run_llm_ingestion(db)
+            method_used = "llm"
+        except Exception as exc:
+            logger.exception("LLM ingestion failed")
+            raise HTTPException(status_code=500, detail=f"LLM ingestion failed: {exc}")
+
+    if stats is None:
+        raise HTTPException(status_code=500, detail="No ingestion method succeeded")
+
     return {
         "status": "complete",
+        "method": method_used,
         "stats": stats,
-        "warning": "This was a synchronous operation. Consider using a task queue for production workloads.",
     }
 
 

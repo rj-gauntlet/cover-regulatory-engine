@@ -127,6 +127,8 @@ class RegulatoryRetriever:
             logger.info("Layer 3: No relevant regulatory chunks found")
             return []
 
+        logger.info(f"Layer 3: Retrieved {len(chunks)} chunks (nearest distance: {chunks[0]['distance']:.4f})")
+
         regulatory_text = "\n\n".join(
             f"[Section {c['section_number']}]: {c['text']}" for c in chunks
         )

@@ -1,6 +1,7 @@
 """LA County GIS clients for parcel boundaries and building footprints."""
 import logging
 import math
+import re
 from typing import Any
 
 import httpx
@@ -80,13 +81,13 @@ class LACountyParcelClient:
     existing structure info (year built, bedrooms, sqft), and legal description.
     """
 
-    async def get_parcel(self, lat: float, lng: float) -> dict | None:
+    async def get_parcel(self, lat: float, lng: float, address: str | None = None) -> dict | None:
         """Get the parcel containing the given point.
 
-        Returns the parcel whose centroid is closest to the query point
-        when multiple parcels intersect the search envelope.
+        When an address is provided, prefers the parcel whose SitusAddress
+        matches the house number + street name. Falls back to closest centroid.
         """
-        buffer = 0.0003  # ~33 meters — tighter than ZIMAS for precision
+        buffer = 0.0003
         envelope = f"{lng - buffer},{lat - buffer},{lng + buffer},{lat + buffer}"
         out_fields = (
             "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,"
@@ -103,7 +104,7 @@ class LACountyParcelClient:
             if not features:
                 return None
 
-        best = self._find_closest(features, lat, lng)
+        best = self._find_best_match(features, lat, lng, address)
         if not best:
             return None
 
@@ -142,16 +143,104 @@ class LACountyParcelClient:
             "center_lon": self._safe_float(props.get("CENTER_LON")),
         }
 
-    def _find_closest(self, features: list[dict], lat: float, lng: float) -> dict | None:
+    def _find_best_match(
+        self, features: list[dict], lat: float, lng: float, address: str | None
+    ) -> dict | None:
+        """Pick the best parcel: address match, then point-in-polygon, then centroid.
+
+        When an address is provided the priority is:
+        1. Exact situs address match (house number + street name)
+        2. Parcel whose polygon contains the geocoded point
+        3. None — no loose centroid fallback to avoid cross-street mismatches
+        """
+        valid = [f for f in features if f.get("geometry", {}).get("type") == "Polygon"
+                 and f.get("geometry", {}).get("coordinates")]
+
+        if not valid:
+            return None
+
+        if address:
+            match = self._match_by_address(valid, address)
+            if match:
+                situs = (match.get("properties", {}).get("SitusAddress") or "").strip()
+                logger.info(f"Parcel matched by address: '{situs}' for query '{address}'")
+                return match
+
+            pip_match = self._find_containing_parcel(valid, lat, lng)
+            if pip_match:
+                situs = (pip_match.get("properties", {}).get("SitusAddress") or "").strip()
+                logger.info(f"Parcel matched by point-in-polygon: '{situs}' for query '{address}'")
+                return pip_match
+
+            logger.warning(f"No county parcel matches address '{address}'")
+            return None
+
+        return self._closest_by_centroid(valid, lat, lng)
+
+    @staticmethod
+    def _find_containing_parcel(features: list[dict], lat: float, lng: float) -> dict | None:
+        """Find the parcel whose polygon contains the geocoded point."""
+        point = (lng, lat)
+        for f in features:
+            if _point_in_polygon(point, f["geometry"]):
+                return f
+        return None
+
+    def _match_by_address(self, features: list[dict], address: str) -> dict | None:
+        """Find the parcel whose SitusAddress matches the searched address.
+
+        Extracts the house number and street name from the query address and
+        compares against each parcel's SitusAddress field.
+        """
+        house_num, street = self._parse_address(address)
+        if not house_num:
+            return None
+
+        for f in features:
+            situs = (f.get("properties", {}).get("SitusAddress") or "").strip().upper()
+            if not situs:
+                continue
+            s_num, s_street = self._parse_address(situs)
+            if s_num == house_num and street and s_street and street in s_street:
+                return f
+
+        return None
+
+    @staticmethod
+    def _parse_address(address: str) -> tuple[str, str]:
+        """Extract (house_number, street_name) from an address string.
+
+        '456 North June Street, Los Angeles, CA 90004' -> ('456', 'JUNE')
+        '456  N JUNE ST' -> ('456', 'JUNE')
+        """
+        addr = address.upper().split(",")[0].strip()
+        addr = re.sub(r"\s+", " ", addr)
+
+        m = re.match(r"^(\d+)\s+(.+)$", addr)
+        if not m:
+            return ("", "")
+
+        house_num = m.group(1)
+        rest = m.group(2)
+
+        direction_words = {"N", "S", "E", "W", "NORTH", "SOUTH", "EAST", "WEST",
+                           "NE", "NW", "SE", "SW"}
+        suffix_words = {"ST", "STREET", "AVE", "AVENUE", "BLVD", "BOULEVARD",
+                        "DR", "DRIVE", "RD", "ROAD", "CT", "COURT", "PL", "PLACE",
+                        "WAY", "LN", "LANE", "CIR", "CIRCLE", "TER", "TERRACE"}
+
+        words = rest.split()
+        street_words = [w for w in words if w not in direction_words and w not in suffix_words]
+        street_name = " ".join(street_words) if street_words else rest
+
+        return (house_num, street_name)
+
+    @staticmethod
+    def _closest_by_centroid(features: list[dict], lat: float, lng: float) -> dict | None:
         best = None
         best_dist = float("inf")
         for f in features:
-            geom = f.get("geometry")
-            if not geom or geom.get("type") != "Polygon":
-                continue
-            coords = geom["coordinates"][0] if geom.get("coordinates") else []
-            if not coords:
-                continue
+            coords = f["geometry"]["coordinates"][0]
             cx = sum(p[0] for p in coords) / len(coords)
             cy = sum(p[1] for p in coords) / len(coords)
             dist = math.sqrt((cx - lng) ** 2 + (cy - lat) ** 2)
@@ -258,3 +347,26 @@ def _point_in_polygon(point: tuple[float, float], polygon: dict) -> bool:
             inside = not inside
         j = i
     return inside
+
+
+def _min_dist_to_polygon(point: tuple[float, float], polygon: dict) -> float:
+    """Minimum distance from a point to any edge of a GeoJSON Polygon."""
+    px, py = point
+    ring = polygon.get("coordinates", [[]])[0]
+    if not ring:
+        return float("inf")
+    min_d = float("inf")
+    n = len(ring)
+    for i in range(n):
+        ax, ay = ring[i][0], ring[i][1]
+        bx, by = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+        dx, dy = bx - ax, by - ay
+        if dx == 0 and dy == 0:
+            d = math.sqrt((px - ax) ** 2 + (py - ay) ** 2)
+        else:
+            t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+            nx, ny = ax + t * dx, ay + t * dy
+            d = math.sqrt((px - nx) ** 2 + (py - ny) ** 2)
+        if d < min_d:
+            min_d = d
+    return min_d

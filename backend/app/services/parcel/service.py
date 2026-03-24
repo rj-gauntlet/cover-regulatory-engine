@@ -14,6 +14,8 @@ from app.services.parcel.geocoder import geocode_address
 from app.services.parcel.zimas import ZIMASClient
 from app.services.parcel.lacounty import LACountyParcelClient, LACountyBuildingClient
 
+_parse_address = LACountyParcelClient._parse_address
+
 CACHE_TTL_DAYS = settings.parcel_cache_ttl_days
 
 logger = logging.getLogger(__name__)
@@ -26,18 +28,74 @@ class ParcelService:
         self.county_parcels = LACountyParcelClient()
         self.county_buildings = LACountyBuildingClient()
 
-    async def get_by_address(self, address: str) -> ParcelSchema | None:
-        """Look up a parcel by street address."""
+    async def get_by_address(
+        self, address: str
+    ) -> tuple[ParcelSchema | None, dict | None]:
+        """Look up a parcel by street address.
+
+        Returns (parcel, geocoded) where geocoded contains lat/lng/full_address
+        even when the parcel itself is not found.
+        """
         geocoded = await geocode_address(address)
         if not geocoded:
             logger.warning(f"Could not geocode address: {address}")
-            return None
+            return None, None
 
-        return await self._get_or_fetch(
+        parcel = await self._get_or_fetch(
             lat=geocoded["lat"],
             lng=geocoded["lng"],
             address=geocoded["full_address"],
         )
+        return parcel, geocoded
+
+    async def get_nearby_addresses(
+        self, lat: float, lng: float, searched_address: str = ""
+    ) -> list[dict]:
+        """Get situs addresses of parcels near a point (for map labels).
+
+        Prioritises addresses on the same street as the searched address,
+        then fills in cross-streets up to a reasonable limit.
+        """
+        import re
+        buffer = 0.0008
+        envelope = f"{lng - buffer},{lat - buffer},{lng + buffer},{lat + buffer}"
+        out_fields = "SitusAddress,SitusFullAddress,CENTER_LAT,CENTER_LON"
+        from app.services.parcel.lacounty import _query_layer, COUNTY_PARCEL_URL
+
+        features = await _query_layer(COUNTY_PARCEL_URL, envelope, out_fields)
+        if not features:
+            return []
+
+        street_match = re.search(r"\d+\s+(.+?)(?:,|\s+(?:LOS|LA)\b)", searched_address.upper())
+        searched_street = street_match.group(1).strip() if street_match else ""
+
+        same_street: list[dict] = []
+        other: list[dict] = []
+
+        for f in features:
+            props = f.get("properties", {})
+            addr = (props.get("SitusAddress") or "").strip()
+            if not addr:
+                continue
+            geom = f.get("geometry")
+            if geom and geom.get("type") == "Polygon" and geom.get("coordinates"):
+                coords = geom["coordinates"][0]
+                cx = sum(p[0] for p in coords) / len(coords)
+                cy = sum(p[1] for p in coords) / len(coords)
+            else:
+                clat = props.get("CENTER_LAT")
+                clng = props.get("CENTER_LON")
+                if clat and clng:
+                    cy, cx = float(clat), float(clng)
+                else:
+                    continue
+            entry = {"address": addr, "lat": cy, "lng": cx}
+            if searched_street and searched_street in addr.upper():
+                same_street.append(entry)
+            else:
+                other.append(entry)
+
+        return same_street + other[:8]
 
     async def get_by_apn(self, apn: str) -> ParcelSchema | None:
         """Look up a parcel by APN (check cache first)."""
@@ -52,8 +110,10 @@ class ParcelService:
         """Check cache, then fetch from County GIS + ZIMAS if needed."""
         cached = await self._find_cached_near(lat, lng)
         if cached:
-            logger.info(f"Cache hit for parcel {cached.apn}")
-            return self._db_to_schema(cached)
+            if not address or self._addresses_match(cached.address, address):
+                logger.info(f"Cache hit for parcel {cached.apn}")
+                return self._db_to_schema(cached)
+            logger.info(f"Cache hit APN={cached.apn} but address mismatch, re-fetching")
 
         logger.info(f"Cache miss, fetching from County GIS + ZIMAS at ({lat}, {lng})")
         parcel_data = await self._fetch_full_parcel(lat, lng, address)
@@ -63,6 +123,17 @@ class ParcelService:
 
         parcel = await self._cache_parcel(parcel_data)
         return self._db_to_schema(parcel)
+
+    @staticmethod
+    def _addresses_match(cached_addr: str | None, searched_addr: str) -> bool:
+        """Check whether a cached parcel address matches the searched address."""
+        if not cached_addr:
+            return False
+        c_num, c_street = _parse_address(cached_addr)
+        s_num, s_street = _parse_address(searched_addr)
+        if not c_num or not s_num:
+            return False
+        return c_num == s_num and c_street and s_street and c_street in s_street
 
     async def _fetch_full_parcel(
         self, lat: float, lng: float, address: str | None = None
@@ -77,39 +148,37 @@ class ParcelService:
             logger.warning(f"No ZIMAS zoning data at ({lat}, {lng})")
             return None
 
-        county_parcel = await self.county_parcels.get_parcel(lat, lng)
+        county_parcel = await self.county_parcels.get_parcel(lat, lng, address)
+        if not county_parcel:
+            if address:
+                logger.warning(f"No county parcel found for address '{address}'")
+                return None
+            logger.warning(f"No county parcel at ({lat}, {lng})")
+            return None
 
-        parcel_geom = county_parcel["geometry"] if county_parcel else None
+        parcel_geom = county_parcel["geometry"]
         buildings = await self.county_buildings.get_buildings_for_parcel(parcel_geom, lat, lng)
 
-        if county_parcel:
-            logger.info(
-                f"County parcel: APN={county_parcel['apn']}, "
-                f"area={county_parcel['lot_area_sqft']} sqft, "
-                f"buildings={len(buildings)}"
-            )
+        logger.info(
+            f"County parcel: APN={county_parcel['apn']}, "
+            f"area={county_parcel['lot_area_sqft']} sqft, "
+            f"buildings={len(buildings)}"
+        )
 
-        parcel_geometry = county_parcel["geometry"] if county_parcel else None
-        lot_area_sqft = county_parcel["lot_area_sqft"] if county_parcel else None
-        lot_width_ft = county_parcel["lot_width_ft"] if county_parcel else None
-        lot_depth_ft = county_parcel["lot_depth_ft"] if county_parcel else None
-        apn = county_parcel["apn"] if county_parcel else ""
-
-        if not apn:
-            apn = f"unknown-{_utcnow().timestamp()}"
+        apn = county_parcel["apn"] or f"unknown-{_utcnow().timestamp()}"
 
         return {
             "apn": apn,
-            "address": address or (county_parcel.get("situs_address", "") if county_parcel else ""),
+            "address": county_parcel.get("situs_address") or address or "",
             "zone_code": zoning.get("zone_code", ""),
             "zone_class": zoning.get("zone_class", ""),
             "height_district": zoning.get("height_district"),
             "specific_plan": zoning.get("specific_plan"),
             "overlay_zones": [zoning["overlay"]] if zoning.get("overlay") else [],
-            "lot_area_sqft": lot_area_sqft,
-            "lot_width_ft": lot_width_ft,
-            "lot_depth_ft": lot_depth_ft,
-            "geometry": parcel_geometry,
+            "lot_area_sqft": county_parcel["lot_area_sqft"],
+            "lot_width_ft": county_parcel["lot_width_ft"],
+            "lot_depth_ft": county_parcel["lot_depth_ft"],
+            "geometry": parcel_geom,
             "building_footprints": buildings,
             "centroid_lat": lat,
             "centroid_lng": lng,

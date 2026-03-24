@@ -60,6 +60,19 @@ export interface AssessmentRequest {
   project_inputs?: Record<string, any>
 }
 
+export interface NearbyParcel {
+  address: string
+  lat: number
+  lng: number
+}
+
+export interface ParcelNotFoundData {
+  detail: string
+  geocoded_lat?: number
+  geocoded_lng?: number
+  nearby_parcels?: NearbyParcel[]
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'

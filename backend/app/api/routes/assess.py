@@ -27,17 +27,25 @@ async def create_assessment(
         raise HTTPException(status_code=400, detail="Provide either an address or APN")
 
     parcel_service = ParcelService(db)
+    geocoded = None
 
     if request.address:
-        parcel = await parcel_service.get_by_address(request.address)
+        parcel, geocoded = await parcel_service.get_by_address(request.address)
     else:
         parcel = await parcel_service.get_by_apn(request.apn)
 
     if not parcel:
-        raise HTTPException(
-            status_code=404,
-            detail="Could not find parcel. Ensure the address is within the City of Los Angeles.",
-        )
+        error_body: dict = {
+            "detail": "Could not find parcel. Ensure the address is within the City of Los Angeles.",
+        }
+        if geocoded:
+            nearby = await parcel_service.get_nearby_addresses(
+                geocoded["lat"], geocoded["lng"], request.address or ""
+            )
+            error_body["geocoded_lat"] = geocoded["lat"]
+            error_body["geocoded_lng"] = geocoded["lng"]
+            error_body["nearby_parcels"] = nearby
+        return JSONResponse(status_code=404, content=error_body)
 
     resolver = RuleResolver(db, llm)
     assessment = await resolver.assess(

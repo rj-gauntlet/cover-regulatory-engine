@@ -5,11 +5,23 @@ import type {
   ChatMessage,
   FeedbackRequest,
   Parcel,
+  ParcelNotFoundData,
   PipelineStatus,
   ZoneRule,
 } from '@/types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || ''
+
+export class ParcelNotFoundError extends Error {
+  data: ParcelNotFoundData
+
+  constructor(data: ParcelNotFoundData) {
+    super(data.detail)
+    this.name = 'ParcelNotFoundError'
+    this.data = data
+    Object.setPrototypeOf(this, ParcelNotFoundError.prototype)
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {}
@@ -24,6 +36,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }))
+
+    if (response.status === 404 && error.geocoded_lat != null) {
+      throw new ParcelNotFoundError(error as ParcelNotFoundData)
+    }
+
     throw new Error(error.detail || `Request failed: ${response.status}`)
   }
 
