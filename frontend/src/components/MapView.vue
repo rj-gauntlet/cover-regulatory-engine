@@ -29,6 +29,7 @@ const SETBACK_COLORS: Record<string, string> = {
 
 const LEGEND_ITEMS = [
   { color: '#1a1a1a', label: 'Parcel Boundary', type: 'line' },
+  { color: '#6b7b8d', label: 'Buildings', type: 'fill' },
   { color: '#c45c5c', label: 'Front Setback', type: 'fill' },
   { color: '#c8956e', label: 'Rear Setback', type: 'fill' },
   { color: '#c8b46e', label: 'Side Setback', type: 'fill' },
@@ -130,7 +131,7 @@ watch(() => props.assessment, async (assessment) => {
 
 function clearLayers() {
   if (!map) return
-  const layerIds = ['parcel-fill', 'parcel-outline', 'buildable-fill', 'buildable-outline', 'setback-front', 'setback-rear', 'setback-side', 'setback-labels', 'buildings-fill']
+  const layerIds = ['parcel-fill', 'parcel-outline', 'buildable-fill', 'buildable-outline', 'setback-front', 'setback-rear', 'setback-side', 'setback-labels', 'buildings-fill', 'buildings-outline']
   const sourceIds = ['parcel', 'buildable', 'setbacks', 'setback-labels', 'buildings']
   for (const id of layerIds) { if (map.getLayer(id)) map.removeLayer(id) }
   for (const id of sourceIds) { if (map.getSource(id)) map.removeSource(id) }
@@ -156,6 +157,26 @@ function addParcelLayers(assessment: Assessment) {
       type: 'line',
       source: 'parcel',
       paint: { 'line-color': '#1a1a1a', 'line-width': 2.5, 'line-dasharray': [2, 1] },
+    })
+  }
+
+  const footprints = parcel.building_footprints_geojson
+  if (footprints && Array.isArray(footprints) && footprints.length > 0) {
+    map.addSource('buildings', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: footprints },
+    })
+    map.addLayer({
+      id: 'buildings-fill',
+      type: 'fill',
+      source: 'buildings',
+      paint: { 'fill-color': '#6b7b8d', 'fill-opacity': 0.35 },
+    })
+    map.addLayer({
+      id: 'buildings-outline',
+      type: 'line',
+      source: 'buildings',
+      paint: { 'line-color': '#4a5568', 'line-width': 1 },
     })
   }
 

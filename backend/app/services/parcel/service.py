@@ -1,6 +1,6 @@
-"""Parcel service: geocode → ZIMAS lookup → cache."""
+"""Parcel service: geocode → County parcel + ZIMAS zoning + LARIAC buildings → cache."""
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from app.models.database import _utcnow
 
@@ -12,6 +12,7 @@ from app.models.database import Parcel
 from app.models.schemas import ParcelSchema
 from app.services.parcel.geocoder import geocode_address
 from app.services.parcel.zimas import ZIMASClient
+from app.services.parcel.lacounty import LACountyParcelClient, LACountyBuildingClient
 
 CACHE_TTL_DAYS = settings.parcel_cache_ttl_days
 
@@ -22,6 +23,8 @@ class ParcelService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.zimas = ZIMASClient()
+        self.county_parcels = LACountyParcelClient()
+        self.county_buildings = LACountyBuildingClient()
 
     async def get_by_address(self, address: str) -> ParcelSchema | None:
         """Look up a parcel by street address."""
@@ -46,23 +49,70 @@ class ParcelService:
     async def _get_or_fetch(
         self, lat: float, lng: float, address: str | None = None
     ) -> ParcelSchema | None:
-        """Check cache, then fetch from ZIMAS if needed."""
+        """Check cache, then fetch from County GIS + ZIMAS if needed."""
         cached = await self._find_cached_near(lat, lng)
         if cached:
             logger.info(f"Cache hit for parcel {cached.apn}")
             return self._db_to_schema(cached)
 
-        logger.info(f"Cache miss, fetching from ZIMAS at ({lat}, {lng})")
-        zimas_data = await self.zimas.get_full_parcel_data(lat, lng)
-        if not zimas_data:
-            logger.warning(f"No ZIMAS data at ({lat}, {lng})")
+        logger.info(f"Cache miss, fetching from County GIS + ZIMAS at ({lat}, {lng})")
+        parcel_data = await self._fetch_full_parcel(lat, lng, address)
+        if not parcel_data:
+            logger.warning(f"No parcel data at ({lat}, {lng})")
             return None
 
-        if address:
-            zimas_data["address"] = address
-
-        parcel = await self._cache_parcel(zimas_data)
+        parcel = await self._cache_parcel(parcel_data)
         return self._db_to_schema(parcel)
+
+    async def _fetch_full_parcel(
+        self, lat: float, lng: float, address: str | None = None
+    ) -> dict | None:
+        """Assemble parcel data from three sources:
+        1. LA County Parcels — boundary geometry, APN, lot area
+        2. ZIMAS — zoning classification
+        3. LARIAC — building footprints
+        """
+        zoning = await self.zimas.get_zoning(lat, lng)
+        if not zoning:
+            logger.warning(f"No ZIMAS zoning data at ({lat}, {lng})")
+            return None
+
+        county_parcel = await self.county_parcels.get_parcel(lat, lng)
+        buildings = await self.county_buildings.get_buildings(lat, lng)
+
+        if county_parcel:
+            logger.info(
+                f"County parcel: APN={county_parcel['apn']}, "
+                f"area={county_parcel['lot_area_sqft']} sqft, "
+                f"buildings={len(buildings)}"
+            )
+
+        parcel_geometry = county_parcel["geometry"] if county_parcel else None
+        lot_area_sqft = county_parcel["lot_area_sqft"] if county_parcel else None
+        lot_width_ft = county_parcel["lot_width_ft"] if county_parcel else None
+        lot_depth_ft = county_parcel["lot_depth_ft"] if county_parcel else None
+        apn = county_parcel["apn"] if county_parcel else ""
+
+        if not apn:
+            apn = f"unknown-{_utcnow().timestamp()}"
+
+        return {
+            "apn": apn,
+            "address": address or (county_parcel.get("situs_address", "") if county_parcel else ""),
+            "zone_code": zoning.get("zone_code", ""),
+            "zone_class": zoning.get("zone_class", ""),
+            "height_district": zoning.get("height_district"),
+            "specific_plan": zoning.get("specific_plan"),
+            "overlay_zones": [zoning["overlay"]] if zoning.get("overlay") else [],
+            "lot_area_sqft": lot_area_sqft,
+            "lot_width_ft": lot_width_ft,
+            "lot_depth_ft": lot_depth_ft,
+            "geometry": parcel_geometry,
+            "building_footprints": buildings,
+            "centroid_lat": lat,
+            "centroid_lng": lng,
+            "community_plan_area": zoning.get("community_plan_area"),
+        }
 
     async def _find_cached_near(self, lat: float, lng: float) -> Parcel | None:
         """Find a cached parcel near the given coordinates that isn't expired."""

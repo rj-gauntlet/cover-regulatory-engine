@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     zimas_base_url: str = "https://zimas.lacity.org/arcgis/rest/services/zma/zimas/MapServer"
 
+    lacounty_parcel_url: str = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0"
+    lacounty_buildings_url: str = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LARIAC_Buildings_2020/MapServer/0"
+
     amlegal_base_url: str = "https://codelibrary.amlegal.com/codes/los_angeles/latest"
 
     parcel_cache_ttl_days: int = 30
