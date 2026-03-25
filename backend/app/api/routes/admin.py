@@ -12,6 +12,7 @@ from app.api.deps import get_session
 from app.models.database import (
     RawSource, ParsedRegulation, RegulatoryChunk, ZoneRule,
     Parcel, Assessment, Constraint, UserFeedback, IngestionLog,
+    GeocodingCache,
 )
 from app.models.schemas import (
     PipelineStatusSchema, ZoneRuleSchema, ZoneRuleUpdate,
@@ -277,11 +278,45 @@ async def list_feedback(
 async def system_stats(db: AsyncSession = Depends(get_session)):
     """System statistics summary."""
     status = await pipeline_status(db)
-    # TODO: replace hardcoded lists with a DB query (e.g. SELECT DISTINCT zone_class FROM zone_rules)
+    zone_classes = (await db.execute(
+        select(ZoneRule.zone_class).distinct().order_by(ZoneRule.zone_class)
+    )).scalars().all()
     return {
         "pipeline": status.model_dump(),
-        "zone_classes_covered": [
-            "R1", "R2", "RD1.5", "RE9", "RE11", "RE15", "RE20", "RE40"
-        ],
+        "zone_classes_covered": list(zone_classes),
         "building_types_supported": ["SFH", "ADU", "Guest House"],
+    }
+
+
+@router.get("/cache-stats")
+async def cache_stats(db: AsyncSession = Depends(get_session)):
+    """Cache statistics for monitoring."""
+    geocoding_count = (await db.execute(
+        select(func.count(GeocodingCache.id))
+    )).scalar() or 0
+    parcel_count = (await db.execute(
+        select(func.count(Parcel.id))
+    )).scalar() or 0
+    assessment_count = (await db.execute(
+        select(func.count(Assessment.id))
+    )).scalar() or 0
+
+    # Recent cache activity (last 24h)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
+
+    recent_geocoding = (await db.execute(
+        select(func.count(GeocodingCache.id)).where(GeocodingCache.cached_at >= cutoff)
+    )).scalar() or 0
+    recent_parcels = (await db.execute(
+        select(func.count(Parcel.id)).where(Parcel.cached_at >= cutoff)
+    )).scalar() or 0
+    recent_assessments = (await db.execute(
+        select(func.count(Assessment.id)).where(Assessment.created_at >= cutoff)
+    )).scalar() or 0
+
+    return {
+        "geocoding_cache": {"total": geocoding_count, "last_24h": recent_geocoding},
+        "parcel_cache": {"total": parcel_count, "last_24h": recent_parcels},
+        "assessment_cache": {"total": assessment_count, "last_24h": recent_assessments},
     }

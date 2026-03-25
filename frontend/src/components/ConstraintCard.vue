@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Constraint } from '@/types'
+import type { Constraint, ComplianceResult } from '@/types'
 import { api } from '@/services/api'
 
 const props = defineProps<{
   constraint: Constraint
   assessmentId: string
+  compliance?: ComplianceResult | null
 }>()
 
 const expanded = ref(false)
@@ -29,6 +30,18 @@ const barColor: Record<string, string> = {
   deterministic_lookup: 'bg-cover-green',
   computed: 'bg-accent',
   llm_interpreted: 'bg-accent',
+}
+
+const complianceBarColor: Record<string, string> = {
+  pass: 'bg-cover-green',
+  fail: 'bg-cover-red',
+  warning: 'bg-amber-400',
+}
+
+const complianceBadge: Record<string, { label: string; color: string }> = {
+  pass: { label: 'PASS', color: 'text-cover-green' },
+  fail: { label: 'FAIL', color: 'text-cover-red' },
+  warning: { label: '⚠', color: 'text-amber-500' },
 }
 
 async function sendFeedback(rating: 'positive' | 'negative') {
@@ -58,7 +71,11 @@ async function sendFeedback(rating: 'positive' | 'negative') {
       class="w-full text-left px-4 py-3 flex items-start justify-between gap-2 relative"
     >
       <div
-        :class="['absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full', barColor[constraint.source_layer] || 'bg-cover-green']"
+        :class="['absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full',
+          compliance?.status && compliance.status !== 'unknown'
+            ? complianceBarColor[compliance.status]
+            : barColor[constraint.source_layer] || 'bg-cover-green'
+        ]"
       />
       <div class="flex-1 min-w-0 pl-2">
         <p class="text-[13px] font-medium text-cover-black leading-snug tracking-tight">
@@ -70,6 +87,12 @@ async function sendFeedback(rating: 'positive' | 'negative') {
           </span>
           <span class="text-[9px] text-surface-300">
             {{ Math.round(constraint.confidence * 100) }}% confidence
+          </span>
+          <span
+            v-if="compliance?.status && compliance.status !== 'unknown'"
+            :class="['text-[9px] font-bold uppercase tracking-wide', complianceBadge[compliance.status]?.color]"
+          >
+            {{ complianceBadge[compliance.status]?.label }}
           </span>
         </div>
       </div>
@@ -83,6 +106,14 @@ async function sendFeedback(rating: 'positive' | 'negative') {
     </button>
 
     <div v-if="expanded" class="px-4 pb-4 space-y-3 border-t border-surface-200 pt-3 pl-6">
+      <div v-if="compliance?.message" :class="[
+        'rounded-md px-3 py-2 text-[11px] font-medium',
+        compliance.status === 'pass' ? 'bg-green-50 text-cover-green' :
+        compliance.status === 'fail' ? 'bg-red-50 text-cover-red' :
+        compliance.status === 'warning' ? 'bg-amber-50 text-amber-700' : ''
+      ]">
+        {{ compliance.message }}
+      </div>
       <div>
         <h4 class="text-[9px] font-bold uppercase tracking-widest text-surface-400 mb-1">Reasoning</h4>
         <p class="text-[12px] text-surface-500 leading-relaxed">{{ constraint.reasoning }}</p>

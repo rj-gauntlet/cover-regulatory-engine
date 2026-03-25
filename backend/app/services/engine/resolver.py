@@ -99,6 +99,19 @@ class RuleResolver:
         else:
             overall_confidence = 0.0
 
+        # Build warnings
+        warnings: list[str] = []
+        if not constraints:
+            warnings.append(
+                f"No zoning rules found for zone class '{parcel.zone_class}' (zone code: {parcel.zone_code}). "
+                "This zone may not yet be supported. Results may be incomplete."
+            )
+        elif all(c.determination_type != "deterministic" for c in constraints):
+            warnings.append(
+                "No deterministic rules were available for this zone. "
+                "All constraints are LLM-interpreted and should be verified."
+            )
+
         # Build summary
         summary = self._build_summary(parcel, building_type, constraints)
 
@@ -109,6 +122,7 @@ class RuleResolver:
             constraints=constraints,
             overall_confidence=round(overall_confidence, 2),
             summary=summary,
+            warnings=warnings,
         )
 
         # Persist to database

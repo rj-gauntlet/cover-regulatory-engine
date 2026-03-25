@@ -50,6 +50,7 @@ export interface Assessment {
   constraints: Constraint[]
   overall_confidence: number
   summary: string
+  warnings: string[]
   created_at: string
 }
 
@@ -122,6 +123,25 @@ export interface ZoneRule {
   source_text: string
   is_verified: boolean
   notes: string | null
+}
+
+// Compliance checker types
+export type ComplianceStatus = 'pass' | 'fail' | 'warning' | 'unknown'
+
+export interface ComplianceResult {
+  status: ComplianceStatus
+  message: string | null
+  inputValue: number | null
+  limitValue: number | null
+}
+
+// Assessment diff types
+export interface ConstraintDiff {
+  parameter: string
+  category: string
+  left: Constraint | null
+  right: Constraint | null
+  isDifferent: boolean
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

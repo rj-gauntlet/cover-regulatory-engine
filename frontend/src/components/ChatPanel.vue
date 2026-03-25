@@ -186,7 +186,7 @@ onUnmounted(() => {
       </template>
 
       <div
-        v-if="streaming && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !messages[messages.length - 1].content"
+        v-if="streaming && (messages.length === 0 || messages[messages.length - 1].role === 'user')"
         class="flex justify-start"
       >
         <div class="bg-surface-50 border border-surface-200 rounded-xl rounded-bl-sm px-3.5 py-2.5">

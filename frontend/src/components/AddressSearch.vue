@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 const STORAGE_KEY = 'cover-recent-searches'
 const MAX_RECENT = 10
@@ -8,12 +8,17 @@ const emit = defineEmits<{
   search: [address: string]
 }>()
 
-defineProps<{
+const props = defineProps<{
   loading: boolean
+  modelValue?: string
 }>()
 
-const address = ref('')
+const address = ref(props.modelValue || '')
 const showDropdown = ref(false)
+
+watch(() => props.modelValue, (v) => {
+  if (v !== undefined && v !== address.value) address.value = v
+})
 const recentSearches = ref<string[]>(loadRecent())
 
 const filteredSearches = computed(() => {
@@ -71,6 +76,19 @@ function handleFocus() {
 function handleBlur() {
   setTimeout(() => { showDropdown.value = false }, 150)
 }
+
+const inputEl = ref<HTMLInputElement | null>(null)
+
+function handleKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    inputEl.value?.focus()
+    inputEl.value?.select()
+  }
+}
+
+onMounted(() => document.addEventListener('keydown', handleKeydown))
+onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
@@ -80,14 +98,16 @@ function handleBlur() {
         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
       </svg>
       <input
+        ref="inputEl"
         v-model="address"
         type="text"
-        placeholder="Enter an LA address (e.g., 11348 Elderwood St)"
-        class="w-full pl-9 pr-4 py-2.5 text-[13px] border border-surface-200 rounded-md bg-surface-50 text-cover-black placeholder:text-surface-300 focus:outline-none focus:border-surface-400 transition-colors"
+        placeholder="Enter an LA address (e.g., 11344 Elderwood St)"
+        class="w-full pl-9 pr-14 py-2.5 text-[13px] border border-surface-200 rounded-md bg-surface-50 text-cover-black placeholder:text-surface-300 focus:outline-none focus:border-surface-400 transition-colors"
         :disabled="loading"
         @focus="handleFocus"
         @blur="handleBlur"
       />
+      <kbd class="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-surface-300 bg-surface-100 border border-surface-200 rounded font-mono pointer-events-none">⌘K</kbd>
       <ul
         v-if="showDropdown && !loading && filteredSearches.length"
         class="absolute z-50 mt-1 w-full bg-white border border-surface-200 rounded-md shadow-lg max-h-60 overflow-y-auto"

@@ -58,6 +58,7 @@ class AssessmentSchema(BaseModel):
     constraints: list[ConstraintSchema] = Field(default_factory=list)
     overall_confidence: float = 1.0
     summary: str = ""
+    warnings: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 

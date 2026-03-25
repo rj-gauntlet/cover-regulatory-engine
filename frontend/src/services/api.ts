@@ -163,6 +163,10 @@ export const api = {
     triggerIngestion(): Promise<{ status: string; stats: Record<string, number> }> {
       return request('/api/admin/pipeline/trigger', { method: 'POST' })
     },
+
+    cacheStats(): Promise<Record<string, { total: number; last_24h: number }>> {
+      return request('/api/admin/cache-stats')
+    },
   },
 
   geojson: {

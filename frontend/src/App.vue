@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
+import { useToast } from '@/composables/useToast'
+
+const { toasts } = useToast()
 </script>
 
 <template>
@@ -29,12 +32,39 @@ import { RouterView } from 'vue-router'
         </router-link>
       </nav>
     </header>
-    <main class="flex-1 overflow-hidden">
+    <main class="flex-1 overflow-y-auto lg:overflow-hidden">
       <RouterView v-slot="{ Component }">
         <KeepAlive>
           <component :is="Component" />
         </KeepAlive>
       </RouterView>
     </main>
+
+    <!-- Toast notifications -->
+    <Teleport to="body">
+      <div class="fixed top-16 right-4 z-50 space-y-2 pointer-events-none">
+        <TransitionGroup name="toast">
+          <div
+            v-for="toast in toasts"
+            :key="toast.id"
+            :class="[
+              'pointer-events-auto px-4 py-2.5 rounded-lg shadow-lg text-[12px] font-medium border transition-all duration-300',
+              toast.type === 'success' ? 'bg-cover-green-dim text-cover-green border-cover-green/20' :
+              toast.type === 'warning' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+              'bg-white text-cover-black border-surface-200'
+            ]"
+          >
+            {{ toast.message }}
+          </div>
+        </TransitionGroup>
+      </div>
+    </Teleport>
   </div>
 </template>
+
+<style>
+.toast-enter-active { transition: all 0.3s ease-out; }
+.toast-leave-active { transition: all 0.2s ease-in; }
+.toast-enter-from { opacity: 0; transform: translateX(40px); }
+.toast-leave-to { opacity: 0; transform: translateX(40px); }
+</style>
