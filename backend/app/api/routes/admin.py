@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 from app.api.deps import get_session
 from app.models.database import (
     RawSource, ParsedRegulation, RegulatoryChunk, ZoneRule,
-    Parcel, Assessment, UserFeedback, IngestionLog,
+    Parcel, Assessment, Constraint, UserFeedback, IngestionLog,
 )
 from app.models.schemas import (
     PipelineStatusSchema, ZoneRuleSchema, ZoneRuleUpdate,
@@ -182,6 +182,18 @@ async def update_rule(
         rule.notes = update.notes
 
     await db.flush()
+
+    # Invalidate cached assessments for parcels using this zone class
+    # so the 7-day cache doesn't serve stale data after a rule edit
+    from sqlalchemy import delete
+    stale = await db.execute(
+        select(Assessment.id).join(Parcel).where(Parcel.zone_class == rule.zone_class)
+    )
+    stale_ids = [row[0] for row in stale.all()]
+    if stale_ids:
+        await db.execute(delete(Constraint).where(Constraint.assessment_id.in_(stale_ids)))
+        await db.execute(delete(Assessment).where(Assessment.id.in_(stale_ids)))
+        await db.flush()
 
     return ZoneRuleSchema(
         id=rule.id,

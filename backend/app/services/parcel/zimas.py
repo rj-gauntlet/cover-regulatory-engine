@@ -72,7 +72,7 @@ class ZIMASClient:
         """Extract base zone class from full zone code (e.g., '[Q]R1-1' -> 'R1')."""
         if not zone_code:
             return ""
-        code = re.sub(r"^[\[\(][A-Z][\]\)]\s*", "", zone_code.upper().strip())
+        code = re.sub(r"^([\[\(][A-Z][\]\)]\s*)+", "", zone_code.upper().strip())
         for prefix in ["RE40", "RE20", "RE15", "RE11", "RE9", "RD1.5", "RD2", "RD3",
                         "RD4", "RD5", "RD6", "R1", "R2", "R3", "R4", "R5", "RS", "RE", "RU",
                         "C1", "C2", "C4", "C5", "CM", "CR", "M1", "M2", "M3", "MR",

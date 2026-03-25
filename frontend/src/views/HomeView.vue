@@ -88,14 +88,14 @@ function togglePanel() {
 const mapCenter = computed(() => {
   if (assessment.value?.parcel) {
     return {
-      lat: assessment.value.parcel.centroid_lat || 34.0522,
-      lng: assessment.value.parcel.centroid_lng || -118.2437,
+      lat: assessment.value.parcel.centroid_lat || 33.9097,
+      lng: assessment.value.parcel.centroid_lng || -118.2971,
     }
   }
   if (searchedLocation.value) {
     return searchedLocation.value
   }
-  return { lat: 34.0522, lng: -118.2437 }
+  return { lat: 33.9097, lng: -118.2971 }
 })
 </script>
 

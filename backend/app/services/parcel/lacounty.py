@@ -212,9 +212,13 @@ class LACountyParcelClient:
 
         '456 North June Street, Los Angeles, CA 90004' -> ('456', 'JUNE')
         '456  N JUNE ST' -> ('456', 'JUNE')
+        '447 N JUNE ST LOS ANGELES CA 90004' -> ('447', 'JUNE')
         """
         addr = address.upper().split(",")[0].strip()
         addr = re.sub(r"\s+", " ", addr)
+        # Strip city/state/zip when no comma separator is present
+        addr = re.sub(r"\s+(?:LOS ANGELES|LA)\s+(?:CA|CALIFORNIA)\s*\d*$", "", addr)
+        addr = re.sub(r"\s+(?:CA|CALIFORNIA)\s*\d*$", "", addr)
 
         m = re.match(r"^(\d+)\s+(.+)$", addr)
         if not m:

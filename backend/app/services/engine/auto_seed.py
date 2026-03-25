@@ -1,7 +1,11 @@
 """Auto-seed zone rules from LAMC when Layer 1 has no data for a zone class.
 
-Flow: zone_class → LAMC section URL → scrape HTML → parse text → LLM extract
-structured rules → save to zone_rules (is_verified=False).
+Flow: zone_class → TOC lookup → LAMC section URL → scrape HTML → parse text
+→ LLM extract structured rules → save to zone_rules (is_verified=False).
+
+The LAMC section mapping is dynamically scraped from the amlegal.com Article 2
+Table of Contents, cached in the toc_entries table, and refreshed on cache miss
+only when the TOC page content has changed.
 """
 import json
 import logging
@@ -13,44 +17,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import ZoneRule
+from app.services.engine.toc_scraper import (
+    lookup_zone_in_toc,
+    scrape_toc,
+    get_toc_hash,
+    save_toc,
+)
 from app.services.llm.base import LLMService
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://codelibrary.amlegal.com/codes/los_angeles/latest"
-
-ZONE_CLASS_TO_SECTION: dict[str, dict] = {
-    "A1": {"section": "12.05", "url": "/lapz/0-0-0-1971", "title": "A1 Agricultural Zone"},
-    "A2": {"section": "12.06", "url": "/lapz/0-0-0-2011", "title": "A2 Agricultural Zone"},
-    "RE": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RE9": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RE11": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RE15": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RE20": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RE40": {"section": "12.07", "url": "/lapz/0-0-0-2021", "title": "RE Residential Estate Zone"},
-    "RS": {"section": "12.07.01", "url": "/lapz/0-0-0-2031", "title": "RS Suburban Zone"},
-    "R1": {"section": "12.08", "url": "/lapz/0-0-0-2052", "title": "R1 One-Family Zone"},
-    "RU": {"section": "12.08.5", "url": "/lapz/0-0-0-2081", "title": "RU Zone"},
-    "R2": {"section": "12.09", "url": "/lapz/0-0-0-2091", "title": "R2 Two-Family Zone"},
-    "RD": {"section": "12.09.5", "url": "/lapz/0-0-0-2111", "title": "RD Restricted Density Zone"},
-    "RD1.5": {"section": "12.09.5", "url": "/lapz/0-0-0-2111", "title": "RD Restricted Density Zone"},
-    "RD2": {"section": "12.09.5", "url": "/lapz/0-0-0-2111", "title": "RD Restricted Density Zone"},
-    "RD3": {"section": "12.09.5", "url": "/lapz/0-0-0-2111", "title": "RD Restricted Density Zone"},
-    "R3": {"section": "12.10", "url": "/lapz/0-0-0-2131", "title": "R3 Multiple Dwelling Zone"},
-    "R4": {"section": "12.11", "url": "/lapz/0-0-0-2161", "title": "R4 Multiple Dwelling Zone"},
-    "R5": {"section": "12.11.5", "url": "/lapz/0-0-0-2191", "title": "R5 Multiple Dwelling Zone"},
-    "C1": {"section": "12.12", "url": "/lapz/0-0-0-2201", "title": "C1 Limited Commercial Zone"},
-    "C1.5": {"section": "12.12.5", "url": "/lapz/0-0-0-2221", "title": "C1.5 Limited Commercial Zone"},
-    "C2": {"section": "12.13", "url": "/lapz/0-0-0-2241", "title": "C2 Commercial Zone"},
-    "C4": {"section": "12.14", "url": "/lapz/0-0-0-2271", "title": "C4 Commercial Zone"},
-    "C5": {"section": "12.14.5", "url": "/lapz/0-0-0-2291", "title": "C5 Commercial Zone"},
-    "CM": {"section": "12.16", "url": "/lapz/0-0-0-2321", "title": "CM Commercial Manufacturing Zone"},
-    "M1": {"section": "12.17", "url": "/lapz/0-0-0-2341", "title": "M1 Limited Industrial Zone"},
-    "M2": {"section": "12.18", "url": "/lapz/0-0-0-2351", "title": "M2 Light Industrial Zone"},
-    "M3": {"section": "12.19", "url": "/lapz/0-0-0-2361", "title": "M3 Heavy Industrial Zone"},
-    "PF": {"section": "12.04.09", "url": "/lapz/0-0-0-1951", "title": "PF Public Facilities Zone"},
-    "OS": {"section": "12.04.05", "url": "/lapz/0-0-0-1951", "title": "OS Open Space Zone"},
-}
 
 EXTRACTION_PROMPT = """You are a zoning code expert. Extract structured development standards from this Los Angeles Municipal Code (LAMC) section for the **{zone_class}** zone.
 
@@ -122,6 +99,46 @@ async def _fetch_section_text(url_path: str) -> str | None:
     return text
 
 
+async def _resolve_section_info(zone_class: str, db: AsyncSession) -> dict | None:
+    """Resolve zone_class to LAMC section info using the cached TOC.
+
+    If the zone isn't in the cached TOC, re-scrapes the TOC page and retries
+    only if the page content has changed.
+
+    Returns {"section": ..., "url": ..., "title": ...} or None.
+    """
+    # 1. Try cached TOC
+    section_info = await lookup_zone_in_toc(zone_class, db)
+    if section_info:
+        return section_info
+
+    # 2. Cache miss — scrape the TOC page
+    logger.info(f"Zone class {zone_class} not in cached TOC, scraping amlegal TOC...")
+    try:
+        new_hash, entries = await scrape_toc()
+    except Exception as e:
+        logger.error(f"Failed to scrape TOC: {e}")
+        # TOC scrape failed (e.g. 403) — return None to trigger LLM fallback
+        return None
+
+    # 3. Check if TOC has changed since last scrape
+    stored_hash = await get_toc_hash(db)
+    if stored_hash == new_hash:
+        logger.info(f"TOC unchanged (hash: {new_hash[:12]}...), zone class {zone_class} not in LAMC Article 2")
+        return None
+
+    # 4. TOC changed (or first scrape) — save and retry
+    await save_toc(db, new_hash, entries)
+    section_info = await lookup_zone_in_toc(zone_class, db)
+    if not section_info:
+        logger.warning(f"Zone class {zone_class} not found in updated TOC")
+    return section_info
+
+
+# Sentinel value indicating LLM knowledge fallback (no section URL available)
+_LLM_FALLBACK = "llm_fallback"
+
+
 async def auto_seed_zone_rules(
     zone_class: str,
     db: AsyncSession,
@@ -131,11 +148,7 @@ async def auto_seed_zone_rules(
 
     Returns the number of rules created.
     """
-    section_info = ZONE_CLASS_TO_SECTION.get(zone_class)
-    if not section_info:
-        logger.warning(f"No LAMC section mapping for zone class: {zone_class}")
-        return 0
-
+    # Check if rules already exist
     existing = await db.execute(
         select(ZoneRule).where(ZoneRule.zone_class == zone_class).limit(1)
     )
@@ -143,26 +156,41 @@ async def auto_seed_zone_rules(
         logger.info(f"Zone rules already exist for {zone_class}, skipping auto-seed")
         return 0
 
-    logger.info(f"Auto-seeding zone rules for {zone_class} from LAMC Sec. {section_info['section']}")
+    # Resolve zone class to LAMC section via TOC
+    section_info = await _resolve_section_info(zone_class, db)
 
-    regulatory_text = await _fetch_section_text(section_info["url"])
+    if section_info:
+        logger.info(f"Auto-seeding zone rules for {zone_class} from LAMC Sec. {section_info['section']}")
 
-    if regulatory_text:
-        prompt = EXTRACTION_PROMPT.format(
-            zone_class=zone_class,
-            section_number=section_info["section"],
-            title=section_info["title"],
-            regulatory_text=regulatory_text,
-        )
-        source_note = f"Auto-seeded from LAMC Sec. {section_info['section']} text via LLM extraction"
+        # Try to scrape the actual section text
+        regulatory_text = await _fetch_section_text(section_info["url"])
+
+        if regulatory_text:
+            prompt = EXTRACTION_PROMPT.format(
+                zone_class=zone_class,
+                section_number=section_info["section"],
+                title=section_info["title"],
+                regulatory_text=regulatory_text,
+            )
+            source_note = f"Auto-seeded from LAMC Sec. {section_info['section']} text via LLM extraction"
+        else:
+            logger.info(f"LAMC section fetch failed for {zone_class}, falling back to LLM knowledge")
+            prompt = KNOWLEDGE_PROMPT.format(
+                zone_class=zone_class,
+                section_number=section_info["section"],
+                title=section_info["title"],
+            )
+            source_note = f"Auto-seeded from LLM knowledge of LAMC Sec. {section_info['section']} (source text unavailable)"
     else:
-        logger.info(f"LAMC fetch failed for {zone_class}, falling back to LLM knowledge")
+        # TOC lookup failed entirely (scrape blocked or zone not in LAMC)
+        # Fall back to LLM knowledge using just the zone class name
+        logger.info(f"TOC unavailable for {zone_class}, falling back to LLM knowledge")
         prompt = KNOWLEDGE_PROMPT.format(
             zone_class=zone_class,
-            section_number=section_info["section"],
-            title=section_info["title"],
+            section_number="unknown",
+            title=f"{zone_class} Zone",
         )
-        source_note = f"Auto-seeded from LLM knowledge of LAMC Sec. {section_info['section']} (source text unavailable)"
+        source_note = f"Auto-seeded from LLM knowledge of {zone_class} zone (TOC lookup unavailable)"
 
     try:
         response = await llm.complete(
@@ -183,6 +211,8 @@ async def auto_seed_zone_rules(
         logger.warning(f"LLM returned no rules for {zone_class}")
         return 0
 
+    resolved_section = section_info["section"] if section_info else "unknown"
+
     count = 0
     for rule in rules_data:
         try:
@@ -199,7 +229,7 @@ async def auto_seed_zone_rules(
             unit=rule.get("unit", ""),
             conditions=rule.get("conditions"),
             applies_to=rule.get("applies_to", ["ALL"]),
-            section_number=section_info["section"],
+            section_number=resolved_section,
             source_text=rule.get("source_text", "Auto-extracted from LAMC"),
             is_verified=False,
             notes=source_note,

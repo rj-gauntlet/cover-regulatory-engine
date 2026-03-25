@@ -1,5 +1,6 @@
 """Parcel service: geocode → County parcel + ZIMAS zoning + LARIAC buildings → cache."""
 import logging
+import re
 from datetime import timedelta
 
 from app.models.database import _utcnow
@@ -8,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.database import Parcel
+from app.models.database import Parcel, GeocodingCache
 from app.models.schemas import ParcelSchema
 from app.services.parcel.geocoder import geocode_address
 from app.services.parcel.zimas import ZIMASClient
@@ -28,6 +29,58 @@ class ParcelService:
         self.county_parcels = LACountyParcelClient()
         self.county_buildings = LACountyBuildingClient()
 
+    @staticmethod
+    def _normalize_address(address: str) -> str:
+        """Normalize address for cache key: lowercase, collapse whitespace, strip trailing city/state."""
+        key = address.strip().lower()
+        key = re.sub(r"\s+", " ", key)
+        key = re.sub(r",?\s*(los angeles|la),?\s*(ca|california)?\s*\d*$", "", key)
+        return key
+
+    async def _get_cached_geocode(self, address: str) -> dict | None:
+        """Check geocoding cache for a previous result."""
+        key = self._normalize_address(address)
+        result = await self.db.execute(
+            select(GeocodingCache).where(
+                GeocodingCache.address_key == key,
+                GeocodingCache.cached_at > _utcnow() - timedelta(days=30),
+            ).limit(1)
+        )
+        cached = result.scalar_one_or_none()
+        if cached:
+            logger.info(f"Geocoding cache hit for '{key}'")
+            return {
+                "lat": cached.lat,
+                "lng": cached.lng,
+                "full_address": cached.full_address,
+                "place_name": cached.place_name,
+            }
+        return None
+
+    async def _cache_geocode(self, address: str, geocoded: dict) -> None:
+        """Store geocoding result in cache."""
+        key = self._normalize_address(address)
+        existing = await self.db.execute(
+            select(GeocodingCache).where(GeocodingCache.address_key == key)
+        )
+        entry = existing.scalar_one_or_none()
+        if entry:
+            entry.lat = geocoded["lat"]
+            entry.lng = geocoded["lng"]
+            entry.full_address = geocoded["full_address"]
+            entry.place_name = geocoded.get("place_name", "")
+            entry.cached_at = _utcnow()
+        else:
+            entry = GeocodingCache(
+                address_key=key,
+                lat=geocoded["lat"],
+                lng=geocoded["lng"],
+                full_address=geocoded["full_address"],
+                place_name=geocoded.get("place_name", ""),
+            )
+            self.db.add(entry)
+        await self.db.flush()
+
     async def get_by_address(
         self, address: str
     ) -> tuple[ParcelSchema | None, dict | None]:
@@ -36,10 +89,14 @@ class ParcelService:
         Returns (parcel, geocoded) where geocoded contains lat/lng/full_address
         even when the parcel itself is not found.
         """
-        geocoded = await geocode_address(address)
+        # Check geocoding cache first
+        geocoded = await self._get_cached_geocode(address)
         if not geocoded:
-            logger.warning(f"Could not geocode address: {address}")
-            return None, None
+            geocoded = await geocode_address(address)
+            if not geocoded:
+                logger.warning(f"Could not geocode address: {address}")
+                return None, None
+            await self._cache_geocode(address, geocoded)
 
         parcel = await self._get_or_fetch(
             lat=geocoded["lat"],

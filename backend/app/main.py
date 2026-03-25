@@ -10,7 +10,7 @@ from app.core.database import engine, async_session, Base
 from app.models.database import (  # noqa: F401
     RawSource, ParsedRegulation, RegulatoryChunk, ZoneRule,
     Parcel, Assessment, Constraint, ChatSession, ChatMessage,
-    UserFeedback, IngestionLog,
+    UserFeedback, IngestionLog, TocEntry,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")

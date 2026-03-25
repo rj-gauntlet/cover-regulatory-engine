@@ -207,6 +207,34 @@ class UserFeedback(Base):
     assessment: Mapped["Assessment"] = relationship(back_populates="feedback")
 
 
+class TocEntry(Base):
+    __tablename__ = "toc_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    zone_class: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    section_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    url_path: Mapped[str] = mapped_column(Text, nullable=False)
+    toc_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class GeocodingCache(Base):
+    __tablename__ = "geocoding_cache"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    address_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
+    full_address: Mapped[str] = mapped_column(Text, nullable=False)
+    place_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    cached_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    __table_args__ = (
+        Index("ix_geocoding_cache_address_key", "address_key"),
+    )
+
+
 class IngestionLog(Base):
     __tablename__ = "ingestion_logs"
 

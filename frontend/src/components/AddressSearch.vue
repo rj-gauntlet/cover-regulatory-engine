@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+
+const STORAGE_KEY = 'cover-recent-searches'
+const MAX_RECENT = 10
 
 const emit = defineEmits<{
   search: [address: string]
@@ -10,12 +13,63 @@ defineProps<{
 }>()
 
 const address = ref('')
+const showDropdown = ref(false)
+const recentSearches = ref<string[]>(loadRecent())
+
+const filteredSearches = computed(() => {
+  const q = address.value.trim().toLowerCase()
+  if (!q) return recentSearches.value
+  return recentSearches.value.filter(s => s.toLowerCase().includes(q))
+})
+
+function loadRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveRecent(addr: string) {
+  const filtered = recentSearches.value.filter(
+    s => s.toLowerCase() !== addr.toLowerCase()
+  )
+  const updated = [addr, ...filtered].slice(0, MAX_RECENT)
+  recentSearches.value = updated
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+}
+
+function removeRecent(addr: string) {
+  const updated = recentSearches.value.filter(
+    s => s.toLowerCase() !== addr.toLowerCase()
+  )
+  recentSearches.value = updated
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+}
 
 function handleSubmit() {
   const trimmed = address.value.trim()
   if (trimmed) {
+    saveRecent(trimmed)
+    showDropdown.value = false
     emit('search', trimmed)
   }
+}
+
+function selectRecent(addr: string) {
+  address.value = addr
+  saveRecent(addr)
+  showDropdown.value = false
+  emit('search', addr)
+}
+
+function handleFocus() {
+  showDropdown.value = true
+}
+
+function handleBlur() {
+  setTimeout(() => { showDropdown.value = false }, 150)
 }
 </script>
 
@@ -31,7 +85,30 @@ function handleSubmit() {
         placeholder="Enter an LA address (e.g., 11348 Elderwood St)"
         class="w-full pl-9 pr-4 py-2.5 text-[13px] border border-surface-200 rounded-md bg-surface-50 text-cover-black placeholder:text-surface-300 focus:outline-none focus:border-surface-400 transition-colors"
         :disabled="loading"
+        @focus="handleFocus"
+        @blur="handleBlur"
       />
+      <ul
+        v-if="showDropdown && !loading && filteredSearches.length"
+        class="absolute z-50 mt-1 w-full bg-white border border-surface-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+      >
+        <li
+          v-for="item in filteredSearches"
+          :key="item"
+          class="flex items-center justify-between px-3 py-2 text-[13px] text-cover-black hover:bg-surface-50 cursor-pointer group"
+          @mousedown.prevent="selectRecent(item)"
+        >
+          <span class="truncate">{{ item }}</span>
+          <button
+            class="ml-2 text-surface-300 hover:text-cover-red opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            @mousedown.prevent.stop="removeRecent(item)"
+          >
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </li>
+      </ul>
     </div>
     <button
       type="submit"

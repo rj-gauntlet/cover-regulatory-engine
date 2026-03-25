@@ -47,7 +47,7 @@ onMounted(() => {
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/light-v11',
     center: [props.center.lng, props.center.lat],
-    zoom: 17,
+    zoom: 20,
   })
 
   map.addControl(new mapboxgl.NavigationControl(), 'top-right')
@@ -55,9 +55,15 @@ onMounted(() => {
 
   map.on('mousemove', handleMouseMove)
   map.on('click', handleMapClick)
+
+  // Show HQ label when no assessment is active
+  if (!props.assessment) {
+    map.on('load', addHqMarker)
+  }
 })
 
 onUnmounted(() => {
+  removeHqMarker()
   if (map) {
     map.off('mousemove', handleMouseMove)
     map.off('click', handleMapClick)
@@ -126,7 +132,11 @@ watch(() => props.assessment, async (assessment) => {
   if (!map) return
   await nextTick()
   clearLayers()
-  if (!assessment?.parcel) return
+  if (!assessment?.parcel) {
+    addHqMarker()
+    return
+  }
+  removeHqMarker()
   if (map.isStyleLoaded()) addParcelLayers(assessment)
   else map.once('style.load', () => addParcelLayers(assessment))
 }, { deep: true })
@@ -156,6 +166,63 @@ function clearLayers() {
 
 let searchMarker: mapboxgl.Marker | null = null
 let nearbyMarkers: mapboxgl.Marker[] = []
+let hqMarker: mapboxgl.Marker | null = null
+
+const COVER_HQ = { lng: -118.2971, lat: 33.9097 }
+const COVER_HQ_FOOTPRINT: [number, number][] = [
+  [-118.29704191758722, 33.90998047163285],
+  [-118.2970433569846, 33.9095311673829],
+  [-118.29723496928564, 33.909531602049974],
+  [-118.29723409539407, 33.909805619214374],
+  [-118.2972489919951, 33.90980563747924],
+  [-118.2972484276437, 33.909980951612646],
+  [-118.29704191758722, 33.90998047163285],
+]
+
+function addHqMarker() {
+  if (!map || hqMarker) return
+
+  // Building footprint overlay
+  if (!map.getSource('cover-hq')) {
+    map.addSource('cover-hq', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [COVER_HQ_FOOTPRINT] },
+        properties: {},
+      },
+    })
+    map.addLayer({
+      id: 'cover-hq-fill',
+      type: 'fill',
+      source: 'cover-hq',
+      paint: { 'fill-color': '#c8a97e', 'fill-opacity': 0.45 },
+    })
+    map.addLayer({
+      id: 'cover-hq-outline',
+      type: 'line',
+      source: 'cover-hq',
+      paint: { 'line-color': '#c8a97e', 'line-width': 2 },
+    })
+  }
+
+  // Text label
+  const el = document.createElement('div')
+  el.style.cssText = 'font:bold 13px Inter,system-ui,sans-serif;color:#0a0a0a;background:#fff;padding:3px 8px;border-radius:5px;border:1.5px solid #1a1a1a;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none;'
+  el.textContent = 'Cover HQ'
+  hqMarker = new mapboxgl.Marker({ element: el, anchor: 'bottom', offset: [0, -8] })
+    .setLngLat([-118.29714, 33.90970])
+    .addTo(map)
+}
+
+function removeHqMarker() {
+  if (hqMarker) { hqMarker.remove(); hqMarker = null }
+  if (map) {
+    if (map.getLayer('cover-hq-fill')) map.removeLayer('cover-hq-fill')
+    if (map.getLayer('cover-hq-outline')) map.removeLayer('cover-hq-outline')
+    if (map.getSource('cover-hq')) map.removeSource('cover-hq')
+  }
+}
 
 function clearNearbyMarkers() {
   for (const m of nearbyMarkers) m.remove()

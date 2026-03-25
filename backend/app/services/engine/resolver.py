@@ -170,7 +170,7 @@ class RuleResolver:
             return None
 
         age = (datetime.now(timezone.utc).replace(tzinfo=None) - cached.created_at).total_seconds()
-        if age > 3600:  # 1 hour cache
+        if age > 604800:  # 7 day cache
             return None
 
         constraint_rows = await self.db.execute(
